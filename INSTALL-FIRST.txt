@@ -1,0 +1,28 @@
+# RC2 Backend Foundation
+
+Replace these files in the project root:
+
+- `server.js`
+- `database.js`
+- `package.json`
+- `.gitignore`
+- `.env.example`
+
+Do not replace your real `.env` with `.env.example`.
+
+After copying the files:
+
+1. Back up `techcpr.db`.
+2. Run `npm install`.
+3. Run `npm start`.
+4. In another terminal, run:
+   `stripe listen --forward-to localhost:3000/webhook`
+5. Test:
+   - `http://localhost:3000/api/status`
+   - a Stripe test checkout
+   - the success redirect containing `session_id`
+
+Important: the existing `node-routeros` package is discontinued and your current
+RouterOS 7.21.4 setup previously required a local `!empty` compatibility fix.
+Do not delete the working `node_modules` folder until we replace or vendor that
+compatibility layer.

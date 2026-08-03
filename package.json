@@ -1,0 +1,23 @@
+{
+  "name": "techcpr-wifi-portal",
+  "version": "1.0.0-rc.2",
+  "private": true,
+  "description": "Stripe-powered WiFi captive portal with MikroTik HotSpot provisioning.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=20.17.0"
+  },
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "node-routeros": "^1.6.9",
+    "sqlite3": "^6.0.1",
+    "stripe": "^22.1.1"
+  }
+}
