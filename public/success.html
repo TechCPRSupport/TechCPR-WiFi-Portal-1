@@ -1,27 +1,111 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>TechCPR WiFi Activated</title><link rel="stylesheet" href="/css/main.css?v=3">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TechCPR WiFi Activated</title>
+  <link rel="stylesheet" href="/css/main.css?v=4.4">
 </head>
-<body><div class="page-shell"><header class="site-header">
-  <div class="header-inner">
-    <img class="brand-logo" src="/images/logo.png" alt="TechCPR Computer Repairs and IT Services">
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="app-header__inner">
+        <img class="app-logo" src="/images/logo.png" alt="TechCPR Computer Repairs and IT Services">
+      </div>
+    </header>
+
+    <main class="app-main">
+      <section class="page-heading" aria-labelledby="page-title">
+        <div class="icon-badge" aria-hidden="true">✓</div>
+        <h1 id="page-title">Payment Successful</h1>
+        <p id="summary">Activating your WiFi access…</p>
+      </section>
+
+      <section class="success-layout">
+        <article class="panel success-card">
+          <h2 class="success-card__title">Your Login Information</h2>
+
+          <div class="credential-list">
+            <div class="credential-item">
+              <div>
+                <span class="credential-item__label">Plan</span>
+                <span id="plan" class="credential-item__value">Loading…</span>
+              </div>
+            </div>
+
+            <div class="credential-item">
+              <div>
+                <span class="credential-item__label">Username</span>
+                <span id="username" class="credential-item__value">Loading…</span>
+              </div>
+              <button class="copy-button" type="button" data-copy="username">Copy</button>
+            </div>
+
+            <div class="credential-item">
+              <div>
+                <span class="credential-item__label">Password</span>
+                <span id="password" class="credential-item__value">Loading…</span>
+              </div>
+              <button class="copy-button" type="button" data-copy="password">Copy</button>
+            </div>
+
+            <div class="credential-item">
+              <div>
+                <span class="credential-item__label">Expires</span>
+                <span id="expires" class="credential-item__value">Loading…</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <aside class="panel success-card">
+          <h2 class="success-card__title">Connect to TechCPR Guest</h2>
+
+          <ol class="connection-steps">
+            <li class="connection-step">
+              <span class="connection-step__number">1</span>
+              <div><strong>Join the network</strong><p>Select <b>TechCPR Guest</b> from your WiFi settings.</p></div>
+            </li>
+            <li class="connection-step">
+              <span class="connection-step__number">2</span>
+              <div><strong>Open the login page</strong><p>Open a browser if the MikroTik portal does not appear automatically.</p></div>
+            </li>
+            <li class="connection-step">
+              <span class="connection-step__number">3</span>
+              <div><strong>Enter your credentials</strong><p>Use the username and password shown on this page.</p></div>
+            </li>
+            <li class="connection-step">
+              <span class="connection-step__number">4</span>
+              <div><strong>Start browsing</strong><p>Your device is ready after the portal accepts your login.</p></div>
+            </li>
+          </ol>
+
+          <div class="panel account-summary">
+            <div class="account-summary__item">
+              <span id="wifi-status" class="account-summary__value">Pending</span>
+              <span class="account-summary__label">WiFi Status</span>
+            </div>
+            <div class="account-summary__item">
+              <span class="account-summary__value">20/10 Mbps</span>
+              <span class="account-summary__label">Plan Speed</span>
+            </div>
+          </div>
+
+          <p class="success-help">
+            <strong>Important:</strong> VPN use is restricted. Monthly plans support two registered devices with one active at a time.
+          </p>
+        </aside>
+      </section>
+
+      <p id="message" class="status-message" role="status" aria-live="polite"></p>
+    </main>
+
+    <footer class="app-footer">
+      Need help? Contact <a href="mailto:TechCPRSupport@gmail.com">TechCPRSupport@gmail.com</a>
+    </footer>
   </div>
-</header>
-<main class="page-content">
-  <section class="page-title"><div class="icon-ring">✓</div><h1>Payment Successful</h1><p id="summary" class="subtitle">Activating your WiFi access…</p></section>
-  <section class="panel success-card">
-    <h2>Your Login Information</h2>
-    <div class="credentials">
-      <div class="credential-row"><span class="credential-label">Plan</span><span id="plan" class="credential-value">Loading…</span></div>
-      <div class="credential-row"><span class="credential-label">Username</span><span id="username" class="credential-value">Loading…</span></div>
-      <div class="credential-row"><span class="credential-label">Password</span><span id="password" class="credential-value">Loading…</span></div>
-      <div class="credential-row"><span class="credential-label">Expires</span><span id="expires" class="credential-value">Loading…</span></div>
-    </div>
-    <div class="steps"><h3>How to connect</h3><ol><li>Connect to <strong>TechCPR Guest</strong>.</li><li>Open a browser if the login page does not appear.</li><li>Enter the username and password above.</li><li>Start browsing.</li></ol></div>
-    <p id="message" class="message"></p>
-  </section>
-</main>
-<footer class="site-footer">Need help? Contact us at <a href="mailto:TechCPRSupport@gmail.com">TechCPRSupport@gmail.com</a></footer>
-</div><script src="/js/success.js" defer></script></body></html>
+
+  <script src="/js/common.js" defer></script>
+  <script src="/js/success.js" defer></script>
+</body>
+</html>

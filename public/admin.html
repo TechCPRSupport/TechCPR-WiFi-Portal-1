@@ -1,30 +1,166 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>TechCPR WiFi Admin</title><link rel="stylesheet" href="/css/main.css?v=3">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TechCPR WiFi Administration</title>
+  <link rel="stylesheet" href="/css/main.css?v=4.3">
 </head>
-<body><div class="page-shell"><header class="site-header">
-  <div class="header-inner">
-    <img class="brand-logo" src="/images/logo.png" alt="TechCPR Computer Repairs and IT Services">
-  </div>
-</header>
-<main class="page-content">
-  <section id="login-panel">
-    <div class="page-title"><div class="icon-ring">🔒</div><h1>WiFi Administration</h1><p class="subtitle">Sign in to access the administration panel.</p></div>
-    <section class="panel auth-wrap">
-      <label for="admin-password">Administrator Password</label>
-      <div class="password-wrap"><span class="input-icon">🔒</span><input class="text-input" id="admin-password" type="password" autocomplete="current-password" placeholder="Enter admin password"></div>
-      <button class="primary-button" id="login-button" type="button">Sign In</button><p id="login-message" class="message"></p>
-    </section>
-  </section>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="app-header__inner">
+        <img
+          class="app-logo"
+          src="/images/logo.png"
+          alt="TechCPR Computer Repairs and IT Services"
+        >
+      </div>
+    </header>
 
-  <section id="dashboard" class="admin-shell" hidden>
-    <div class="page-title"><h1>Customer Management</h1><p class="subtitle">Review access, payment, and provisioning status.</p></div>
-    <div class="admin-toolbar"><input class="text-input" id="search" type="search" placeholder="Search email, plan, or username"><button class="primary-button" id="refresh-button" type="button">Refresh</button></div>
-    <div class="panel table-wrap"><table><thead><tr><th>Email</th><th>Plan</th><th>Username</th><th>Password</th><th>Expires</th><th>Payment</th><th>WiFi</th><th>MikroTik</th></tr></thead><tbody id="users-body"></tbody></table></div>
-    <p id="admin-message" class="message"></p>
-  </section>
-</main>
-<footer class="site-footer">Need help? Contact us at <a href="mailto:TechCPRSupport@gmail.com">TechCPRSupport@gmail.com</a></footer>
-</div><script src="/js/admin.js" defer></script></body></html>
+    <main class="app-main">
+      <section id="login-panel">
+        <div class="page-heading" aria-labelledby="login-title">
+          <div class="icon-badge" aria-hidden="true">🔒</div>
+          <h1 id="login-title">WiFi Administration</h1>
+          <p>Sign in to review customers and system activity.</p>
+        </div>
+
+        <section class="panel admin-login">
+          <label class="admin-login__label" for="admin-password">
+            Administrator Password
+          </label>
+
+          <div class="field">
+            <span class="field__icon" aria-hidden="true">🔒</span>
+            <input
+              class="input"
+              id="admin-password"
+              type="password"
+              autocomplete="current-password"
+              placeholder="Enter admin password"
+            >
+          </div>
+
+          <button class="button" id="login-button" type="button">Sign In</button>
+          <p id="login-message" class="status-message" role="status" aria-live="polite"></p>
+        </section>
+      </section>
+
+      <section id="dashboard" class="admin-dashboard" hidden>
+        <div class="admin-topbar">
+          <div>
+            <h1>Customer Dashboard</h1>
+            <p>Review purchases, account status, and MikroTik provisioning.</p>
+          </div>
+
+          <div class="admin-topbar__actions">
+            <button id="refresh-button" class="button button--secondary" type="button">
+              Refresh
+            </button>
+            <button id="logout-button" class="button button--danger" type="button">
+              Sign Out
+            </button>
+          </div>
+        </div>
+
+        <section class="metric-grid" aria-label="Customer summary">
+          <article class="panel metric-card">
+            <div class="metric-card__icon" aria-hidden="true">👥</div>
+            <div>
+              <div class="metric-card__label">Total Customers</div>
+              <div id="metric-total" class="metric-card__value">0</div>
+            </div>
+          </article>
+
+          <article class="panel metric-card">
+            <div class="metric-card__icon" aria-hidden="true">⌁</div>
+            <div>
+              <div class="metric-card__label">Active Accounts</div>
+              <div id="metric-active" class="metric-card__value">0</div>
+            </div>
+          </article>
+
+          <article class="panel metric-card">
+            <div class="metric-card__icon" aria-hidden="true">◷</div>
+            <div>
+              <div class="metric-card__label">Expiring in 24 Hours</div>
+              <div id="metric-expiring" class="metric-card__value">0</div>
+            </div>
+          </article>
+
+          <article class="panel metric-card">
+            <div class="metric-card__icon" aria-hidden="true">▰</div>
+            <div>
+              <div class="metric-card__label">Paid Records</div>
+              <div id="metric-paid" class="metric-card__value">0</div>
+            </div>
+          </article>
+        </section>
+
+        <section class="panel admin-controls" aria-label="Customer filters">
+          <div class="field">
+            <span class="field__icon" aria-hidden="true">⌕</span>
+            <input
+              class="input"
+              id="search"
+              type="search"
+              placeholder="Search email, plan, username, or status"
+            >
+          </div>
+
+          <select id="plan-filter" class="select" aria-label="Filter by plan">
+            <option value="">All plans</option>
+            <option value="1 day">1 Day</option>
+            <option value="7 days">7 Days</option>
+            <option value="1 month">1 Month</option>
+          </select>
+
+          <select id="status-filter" class="select" aria-label="Filter by WiFi status">
+            <option value="">All WiFi statuses</option>
+            <option value="active">Active</option>
+            <option value="pending">Pending</option>
+            <option value="expired">Expired</option>
+            <option value="provisioning error">Provisioning Error</option>
+          </select>
+        </section>
+
+        <section class="panel admin-table-panel">
+          <div class="admin-table-scroll">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Email</th>
+                  <th>Plan</th>
+                  <th>Username</th>
+                  <th>Expires</th>
+                  <th>Payment</th>
+                  <th>WiFi</th>
+                  <th>MikroTik</th>
+                  <th>Created</th>
+                </tr>
+              </thead>
+              <tbody id="users-body">
+                <tr>
+                  <td class="admin-table__empty" colspan="8">Sign in to load customer records.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="record-count" class="admin-record-count">Showing 0 of 0 record(s)</div>
+        </section>
+
+        <p id="admin-message" class="status-message" role="status" aria-live="polite"></p>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      Need help? Contact
+      <a href="mailto:TechCPRSupport@gmail.com">TechCPRSupport@gmail.com</a>
+    </footer>
+  </div>
+
+  <script src="/js/common.js" defer></script>
+  <script src="/js/admin.js" defer></script>
+</body>
+</html>

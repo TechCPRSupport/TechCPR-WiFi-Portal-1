@@ -1,1 +1,76 @@
-(()=>{"use strict";const q=new URLSearchParams(location.search),id=q.get("session_id"),msg=document.getElementById("message"),sum=document.getElementById("summary");if(!id)return fail("Missing Stripe session ID.");load(0);async function load(n){try{const r=await fetch(`/api/purchase/${encodeURIComponent(id)}`,{cache:"no-store"}),d=await r.json();if(r.status===404&&n<10){sum.textContent="Payment received. Preparing your WiFi account…";return setTimeout(()=>load(n+1),1500)}if(!r.ok)throw new Error(d.error||"Unable to retrieve your WiFi account.");document.getElementById("plan").textContent=d.plan||"WiFi Access";document.getElementById("username").textContent=d.username||"Unavailable";document.getElementById("password").textContent=d.password||"Unavailable";document.getElementById("expires").textContent=d.expires?new Date(d.expires).toLocaleString():"Unavailable";sum.textContent=d.wifi_status==="Active"?"Your WiFi access has been activated.":`Account status: ${d.wifi_status||"Pending"}`;msg.textContent=""}catch(e){fail(e.message||"Unable to load your account.")}}function fail(t){sum.textContent="We could not finish displaying your account.";msg.textContent=`${t} Contact TechCPRSupport@gmail.com for assistance.`;msg.className="message error"}})();
+(() => {
+  "use strict";
+
+  const params=new URLSearchParams(window.location.search);
+  const sessionId=params.get("session_id");
+  const summary=document.getElementById("summary");
+  const message=document.getElementById("message");
+
+  const fields={
+    plan:document.getElementById("plan"),
+    username:document.getElementById("username"),
+    password:document.getElementById("password"),
+    expires:document.getElementById("expires"),
+    status:document.getElementById("wifi-status")
+  };
+
+  document.querySelectorAll("[data-copy]").forEach(button=>{
+    button.addEventListener("click",async()=>{
+      const field=fields[button.dataset.copy];
+      const original=button.textContent;
+      const copied=await TechCPR.copyText(field?.textContent || "");
+      button.textContent=copied?"Copied":"Copy failed";
+      setTimeout(()=>button.textContent=original,1500);
+    });
+  });
+
+  if(!sessionId){
+    fail("Missing Stripe session ID.");
+    return;
+  }
+
+  loadPurchase(0);
+
+  async function loadPurchase(attempt){
+    try{
+      const response=await fetch(`/api/purchase/${encodeURIComponent(sessionId)}`,{
+        cache:"no-store"
+      });
+      const data=await response.json();
+
+      if(response.status===404 && attempt<12){
+        summary.textContent="Payment received. Preparing your WiFi account…";
+        setTimeout(()=>loadPurchase(attempt+1),1500);
+        return;
+      }
+
+      if(!response.ok){
+        throw new Error(data.error || "Unable to retrieve your WiFi account.");
+      }
+
+      fields.plan.textContent=data.plan || "WiFi Access";
+      fields.username.textContent=data.username || "Unavailable";
+      fields.password.textContent=data.password || "Unavailable";
+      fields.expires.textContent=TechCPR.formatDate(data.expires);
+      fields.status.textContent=data.wifi_status || "Pending";
+
+      summary.textContent=
+        data.wifi_status==="Active"
+          ?"Your WiFi access is ready."
+          :`Account status: ${data.wifi_status || "Pending"}`;
+
+      TechCPR.setMessage(message,"Keep these credentials available until your access period ends.");
+    }catch(error){
+      fail(error.message || "Unable to load your account.");
+    }
+  }
+
+  function fail(text){
+    summary.textContent="We could not finish displaying your account.";
+    TechCPR.setMessage(
+      message,
+      `${text} Contact TechCPRSupport@gmail.com for assistance.`,
+      "error"
+    );
+  }
+})();
