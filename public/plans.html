@@ -1,57 +1,118 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>TechCPR WiFi Access</title><link rel="stylesheet" href="/css/main.css?v=3">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TechCPR WiFi Access</title>
+  <link rel="stylesheet" href="/css/main.css?v=4.1">
 </head>
-<body><div class="page-shell"><header class="site-header">
-  <div class="header-inner">
-    <img class="brand-logo" src="/images/logo.png" alt="TechCPR Computer Repairs and IT Services">
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="app-header__inner">
+        <img
+          class="app-logo"
+          src="/images/logo.png"
+          alt="TechCPR Computer Repairs and IT Services"
+        >
+      </div>
+    </header>
+
+    <main class="app-main">
+      <section class="page-heading" aria-labelledby="page-title">
+        <div class="icon-badge" aria-hidden="true">⌁</div>
+        <h1 id="page-title">Premium WiFi Access</h1>
+        <p>Enter your email and choose your access plan.</p>
+      </section>
+
+      <form id="checkout-form" class="checkout-form" novalidate>
+        <div class="checkout-email field">
+          <span class="field__icon" aria-hidden="true">✉</span>
+          <input
+            class="input"
+            id="email"
+            name="email"
+            type="email"
+            autocomplete="email"
+            placeholder="Enter your email address"
+            required
+          >
+        </div>
+
+        <section class="plan-grid" aria-label="Available WiFi plans">
+          <article class="panel plan-card">
+            <div class="plan-card__icon" aria-hidden="true">◷</div>
+            <div class="plan-card__name">1 Day</div>
+            <div class="plan-card__price">$10</div>
+            <div class="plan-card__rule"></div>
+            <ul class="plan-card__features">
+              <li><span>✓</span> 1 registered device</li>
+              <li><span>✓</span> 20 Mbps download</li>
+              <li><span>✓</span> 10 Mbps upload</li>
+              <li><span>✓</span> Unlimited data</li>
+            </ul>
+            <button class="button" type="submit" data-plan="day">Get Access</button>
+          </article>
+
+          <article class="panel plan-card plan-card--featured">
+            <div class="plan-card__icon" aria-hidden="true">▦</div>
+            <div class="plan-card__name">7 Days</div>
+            <div class="plan-card__price">$25</div>
+            <div class="plan-card__rule"></div>
+            <ul class="plan-card__features">
+              <li><span>✓</span> 1 registered device</li>
+              <li><span>✓</span> 20 Mbps download</li>
+              <li><span>✓</span> 10 Mbps upload</li>
+              <li><span>✓</span> Unlimited data</li>
+            </ul>
+            <button class="button" type="submit" data-plan="week">Get Access</button>
+          </article>
+
+          <article class="panel plan-card">
+            <div class="plan-card__icon" aria-hidden="true">▤</div>
+            <div class="plan-card__name">1 Month</div>
+            <div class="plan-card__price">$50</div>
+            <div class="plan-card__rule"></div>
+            <ul class="plan-card__features">
+              <li><span>✓</span> 2 registered devices</li>
+              <li><span>✓</span> 1 active device at a time</li>
+              <li><span>✓</span> 20/10 Mbps speed</li>
+              <li><span>✓</span> Unlimited data</li>
+            </ul>
+            <button class="button" type="submit" data-plan="month">Get Access</button>
+          </article>
+        </section>
+
+        <p id="message" class="status-message" role="status" aria-live="polite"></p>
+      </form>
+
+      <section class="panel feature-strip" aria-label="WiFi service policies">
+        <div class="feature-strip__item">
+          <span class="feature-strip__icon" aria-hidden="true">🛡</span>
+          <span><strong>VPN restricted</strong><br>Fair access for everyone</span>
+        </div>
+        <div class="feature-strip__item">
+          <span class="feature-strip__icon" aria-hidden="true">▣</span>
+          <span><strong>Device controlled</strong><br>Sharing protection</span>
+        </div>
+        <div class="feature-strip__item">
+          <span class="feature-strip__icon" aria-hidden="true">⚡</span>
+          <span><strong>20/10 Mbps</strong><br>Every plan</span>
+        </div>
+        <div class="feature-strip__item">
+          <span class="feature-strip__icon" aria-hidden="true">∞</span>
+          <span><strong>Unlimited data</strong><br>No usage cap</span>
+        </div>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      Need help? Contact
+      <a href="mailto:TechCPRSupport@gmail.com">TechCPRSupport@gmail.com</a>
+    </footer>
   </div>
-</header>
-<main class="page-content">
-  <section class="page-title">
-    <div class="icon-ring">⌁</div>
-    <h1>Premium WiFi Access</h1>
-    <p class="subtitle">Enter your email and choose your access plan.</p>
-  </section>
 
-  <form id="checkout-form" class="checkout-form" novalidate>
-    <div class="email-wrap">
-      <span class="input-icon">✉</span>
-      <input class="text-input" id="email" name="email" type="email" autocomplete="email" placeholder="Enter your email address" required>
-    </div>
-
-    <div class="plans-grid">
-      <article class="panel plan-card">
-        <div class="plan-icon">◷</div>
-        <div class="plan-name">1 Day</div><div class="plan-price">$10</div><div class="plan-divider"></div>
-        <ul class="feature-list"><li>✓ 1 Device</li><li>✓ 20 Mbps Download</li><li>✓ 10 Mbps Upload</li><li>✓ Unlimited Data</li></ul>
-        <button class="primary-button" type="submit" data-plan="day">Get Access</button>
-      </article>
-
-      <article class="panel plan-card featured">
-        <div class="plan-icon">▦</div>
-        <div class="plan-name">7 Days</div><div class="plan-price">$25</div><div class="plan-divider"></div>
-        <ul class="feature-list"><li>✓ 1 Device</li><li>✓ 20 Mbps Download</li><li>✓ 10 Mbps Upload</li><li>✓ Unlimited Data</li></ul>
-        <button class="primary-button" type="submit" data-plan="week">Get Access</button>
-      </article>
-
-      <article class="panel plan-card">
-        <div class="plan-icon">▤</div>
-        <div class="plan-name">1 Month</div><div class="plan-price">$50</div><div class="plan-divider"></div>
-        <ul class="feature-list"><li>✓ 2 Devices (One at a Time)</li><li>✓ 20 Mbps Download</li><li>✓ 10 Mbps Upload</li><li>✓ Unlimited Data</li></ul>
-        <button class="primary-button" type="submit" data-plan="month">Get Access</button>
-      </article>
-    </div>
-
-    <p id="message" class="message" role="status"></p>
-  </form>
-
-  <section class="panel policy-panel">
-    <article class="policy-item"><div class="policy-icon">🛡</div><div><h3>VPN Restricted</h3><p>VPN usage is not allowed. This helps ensure a fair experience for all users.</p></div></article>
-    <article class="policy-item"><div class="policy-icon">▣</div><div><h3>One Device at a Time</h3><p>Monthly plans allow two registered devices, with one active at a time.</p></div></article>
-  </section>
-</main>
-<footer class="site-footer">Need help? Contact us at <a href="mailto:TechCPRSupport@gmail.com">TechCPRSupport@gmail.com</a></footer>
-</div><script src="/js/plans.js" defer></script></body></html>
+  <script src="/js/common.js" defer></script>
+  <script src="/js/plans.js" defer></script>
+</body>
+</html>

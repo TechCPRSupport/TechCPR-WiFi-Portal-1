@@ -1,1 +1,60 @@
-(()=>{"use strict";const f=document.getElementById("checkout-form"),e=document.getElementById("email"),m=document.getElementById("message"),b=[...document.querySelectorAll("[data-plan]")];let p=null;b.forEach(x=>x.addEventListener("click",()=>p=x.dataset.plan));f.addEventListener("submit",async t=>{t.preventDefault();const v=e.value.trim();if(!p)return s("Please choose a plan.",true);if(!e.checkValidity()){s("Please enter a valid email address.",true);return e.focus()}l(true);s("Opening secure checkout…",false);try{const r=await fetch("/checkout",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({plan:p,email:v})}),d=await r.json();if(!r.ok||!d.url)throw new Error(d.error||"Unable to start checkout.");window.location.assign(d.url)}catch(err){s(err.message||"Unable to connect to the payment server.",true);l(false)}});function l(v){b.forEach(x=>{x.disabled=v;x.textContent=v?"Please wait…":"Get Access"})}function s(t,err){m.textContent=t;m.className=`message ${err?"error":"success"}`}})();
+(() => {
+  "use strict";
+
+  const form = document.getElementById("checkout-form");
+  const emailInput = document.getElementById("email");
+  const message = document.getElementById("message");
+  const buttons = [...document.querySelectorAll("[data-plan]")];
+
+  let selectedPlan = "";
+
+  for (const button of buttons) {
+    button.addEventListener("click", () => {
+      selectedPlan = button.dataset.plan || "";
+    });
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    if (!selectedPlan) {
+      TechCPR.setMessage(message, "Please choose a plan.", "error");
+      return;
+    }
+
+    if (!emailInput.checkValidity()) {
+      TechCPR.setMessage(message, "Please enter a valid email address.", "error");
+      emailInput.focus();
+      return;
+    }
+
+    TechCPR.setBusy(buttons, true);
+    TechCPR.setMessage(message, "Opening secure checkout…");
+
+    try {
+      const response = await fetch("/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          plan: selectedPlan,
+          email: emailInput.value.trim()
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.url) {
+        throw new Error(data.error || "Unable to start checkout.");
+      }
+
+      window.location.assign(data.url);
+    } catch (error) {
+      TechCPR.setMessage(
+        message,
+        error.message || "Unable to connect to the payment server.",
+        "error"
+      );
+      TechCPR.setBusy(buttons, false);
+    }
+  });
+})();
