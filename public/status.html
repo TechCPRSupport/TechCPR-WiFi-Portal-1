@@ -1,1 +1,21 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>TechCPR System Status</title><link rel="stylesheet" href="/css/main.css"></head><body><main class="page-shell"><section class="panel content-card"><img class="brand-logo" src="/images/logo.png" alt="TechCPR"><h1>System Status</h1><p class="subtitle">Live health information for the TechCPR WiFi Portal.</p><div class="status-grid"><article class="panel status-card"><h3>Server</h3><div id="server" class="status-value">Checking…</div></article><article class="panel status-card"><h3>Database</h3><div id="database" class="status-value">Checking…</div></article><article class="panel status-card"><h3>Stripe</h3><div id="stripe" class="status-value">Checking…</div></article><article class="panel status-card"><h3>MikroTik</h3><div id="mikrotik" class="status-value">Checking…</div></article></div><p id="timestamp" class="footer-note"></p><p id="message" class="message"></p></section></main><script src="/js/status.js" defer></script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TechCPR System Status</title><link rel="stylesheet" href="/css/main.css?v=3">
+</head>
+<body><div class="page-shell"><header class="site-header">
+  <div class="header-inner">
+    <img class="brand-logo" src="/images/logo.png" alt="TechCPR Computer Repairs and IT Services">
+  </div>
+</header>
+<main class="page-content">
+  <section class="page-title"><h1>🛡 System Status</h1><p class="subtitle">Live health information for the TechCPR WiFi Portal.</p></section>
+  <section class="status-grid">
+    <article class="panel status-card"><div class="status-icon">▤</div><div><h3>Server</h3><div id="server" class="status-value">Checking…</div><p class="status-description">The server is running normally.</p></div></article>
+    <article class="panel status-card"><div class="status-icon">◉</div><div><h3>Database</h3><div id="database" class="status-value">Checking…</div><p class="status-description">Customer and payment records are available.</p></div></article>
+    <article class="panel status-card"><div class="status-icon">▰</div><div><h3>Stripe</h3><div id="stripe" class="status-value">Checking…</div><p class="status-description">The payment system is configured.</p></div></article>
+    <article class="panel status-card"><div class="status-icon">⌁</div><div><h3>MikroTik</h3><div id="mikrotik" class="status-value">Checking…</div><p class="status-description">Connected to the TechCPR gateway.</p></div></article>
+  </section>
+  <p id="timestamp" class="timestamp"></p><p id="message" class="message"></p>
+</main></div><script src="/js/status.js" defer></script></body></html>

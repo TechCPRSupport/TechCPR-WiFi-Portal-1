@@ -1,28 +1,29 @@
-# RC2 Backend Foundation
+TECHCPR WIFI PORTAL RC3 - CLEAN INSTALL
 
-Replace these files in the project root:
+IMPORTANT: Do not permanently delete your existing .env or techcpr.db.
 
-- `server.js`
-- `database.js`
-- `package.json`
-- `.gitignore`
-- `.env.example`
+1. Stop Node and Stripe CLI.
+2. Back up the entire current project folder.
+3. Save these two files separately:
+   - .env
+   - techcpr.db
+4. Empty the project folder, but keep the hidden .git folder if you want to preserve Git history.
+5. Copy all RC3 files into the project folder.
+6. Copy your saved .env and techcpr.db into the project root.
+7. Confirm .env uses BASE_URL, not PUBLIC_BASE_URL, and contains ADMIN_PASSWORD.
+8. Run:
+   npm install
+9. Because node-routeros required a RouterOS 7.21.4 !empty compatibility patch earlier, test before checkout:
+   npm run test:mikrotik
+10. Start:
+   npm start
+11. Test:
+   http://localhost:3000/status.html
+   http://localhost:3000/plans.html
+   http://localhost:3000/admin.html
+12. Start Stripe CLI and update STRIPE_WEBHOOK_SECRET if it gives you a new whsec value.
 
-Do not replace your real `.env` with `.env.example`.
+SECURITY:
+Secrets previously pasted into chat should be rotated before production.
 
-After copying the files:
-
-1. Back up `techcpr.db`.
-2. Run `npm install`.
-3. Run `npm start`.
-4. In another terminal, run:
-   `stripe listen --forward-to localhost:3000/webhook`
-5. Test:
-   - `http://localhost:3000/api/status`
-   - a Stripe test checkout
-   - the success redirect containing `session_id`
-
-Important: the existing `node-routeros` package is discontinued and your current
-RouterOS 7.21.4 setup previously required a local `!empty` compatibility fix.
-Do not delete the working `node_modules` folder until we replace or vendor that
-compatibility layer.
+RC3 automatically reapplies the RouterOS 7 !empty compatibility patch after npm install.

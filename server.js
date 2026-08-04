@@ -29,22 +29,22 @@ const plans = Object.freeze({
   day: {
     displayName: "1 Day",
     stripeName: "TechCPR 1 Day WiFi",
-    amount: 1000,
-    profile: "customer",
+    amount: Number(process.env.PRICE_DAY_CENTS || 1000),
+    profile: process.env.MIKROTIK_CUSTOMER_PROFILE || "customer",
     durationMs: 24 * 60 * 60 * 1000
   },
   week: {
     displayName: "7 Days",
     stripeName: "TechCPR 7 Day WiFi",
-    amount: 2500,
-    profile: "customer",
+    amount: Number(process.env.PRICE_WEEK_CENTS || 2500),
+    profile: process.env.MIKROTIK_CUSTOMER_PROFILE || "customer",
     durationMs: 7 * 24 * 60 * 60 * 1000
   },
   month: {
     displayName: "1 Month",
     stripeName: "TechCPR 1 Month WiFi",
-    amount: 5000,
-    profile: "customer",
+    amount: Number(process.env.PRICE_MONTH_CENTS || 5000),
+    profile: process.env.MIKROTIK_CUSTOMER_PROFILE || "customer",
     durationMs: 30 * 24 * 60 * 60 * 1000
   }
 });
@@ -144,11 +144,12 @@ async function provisionCompletedCheckout(session) {
   );
 
   try {
-    await mikrotik.createWifiUser(
+    await mikrotik.createWifiUser({
       username,
       password,
-      selectedPlan.profile
-    );
+      profile: selectedPlan.profile,
+      comment: `TechCPR ${selectedPlan.displayName} - ${email}`
+    });
 
     await db.run(
       `UPDATE wifi_users

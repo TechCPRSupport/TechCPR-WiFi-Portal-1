@@ -1,1 +1,30 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>TechCPR WiFi Admin</title><link rel="stylesheet" href="/css/main.css"></head><body><main class="page-shell"><section class="admin-shell"><img class="brand-logo" src="/images/logo.png" alt="TechCPR"><h1>WiFi Administration</h1><div class="panel content-card" id="login-panel"><h2>Administrator Login</h2><div class="form-row"><input class="text-input" id="admin-password" type="password" autocomplete="current-password" placeholder="Admin password"></div><button class="primary-button" id="login-button" type="button">Sign In</button><p id="login-message" class="message"></p></div><section id="dashboard" hidden><div class="admin-toolbar"><input class="text-input" id="search" type="search" placeholder="Search email, plan, or username"><button class="primary-button" id="refresh-button" type="button">Refresh</button></div><div class="panel table-wrap"><table><thead><tr><th>Email</th><th>Plan</th><th>Username</th><th>Password</th><th>Expires</th><th>Payment</th><th>WiFi</th><th>MikroTik</th></tr></thead><tbody id="users-body"></tbody></table></div><p id="admin-message" class="message"></p></section></section></main><script src="/js/admin.js" defer></script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TechCPR WiFi Admin</title><link rel="stylesheet" href="/css/main.css?v=3">
+</head>
+<body><div class="page-shell"><header class="site-header">
+  <div class="header-inner">
+    <img class="brand-logo" src="/images/logo.png" alt="TechCPR Computer Repairs and IT Services">
+  </div>
+</header>
+<main class="page-content">
+  <section id="login-panel">
+    <div class="page-title"><div class="icon-ring">🔒</div><h1>WiFi Administration</h1><p class="subtitle">Sign in to access the administration panel.</p></div>
+    <section class="panel auth-wrap">
+      <label for="admin-password">Administrator Password</label>
+      <div class="password-wrap"><span class="input-icon">🔒</span><input class="text-input" id="admin-password" type="password" autocomplete="current-password" placeholder="Enter admin password"></div>
+      <button class="primary-button" id="login-button" type="button">Sign In</button><p id="login-message" class="message"></p>
+    </section>
+  </section>
+
+  <section id="dashboard" class="admin-shell" hidden>
+    <div class="page-title"><h1>Customer Management</h1><p class="subtitle">Review access, payment, and provisioning status.</p></div>
+    <div class="admin-toolbar"><input class="text-input" id="search" type="search" placeholder="Search email, plan, or username"><button class="primary-button" id="refresh-button" type="button">Refresh</button></div>
+    <div class="panel table-wrap"><table><thead><tr><th>Email</th><th>Plan</th><th>Username</th><th>Password</th><th>Expires</th><th>Payment</th><th>WiFi</th><th>MikroTik</th></tr></thead><tbody id="users-body"></tbody></table></div>
+    <p id="admin-message" class="message"></p>
+  </section>
+</main>
+<footer class="site-footer">Need help? Contact us at <a href="mailto:TechCPRSupport@gmail.com">TechCPRSupport@gmail.com</a></footer>
+</div><script src="/js/admin.js" defer></script></body></html>
