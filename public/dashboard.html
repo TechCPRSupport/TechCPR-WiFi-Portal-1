@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TechCPR Operations Dashboard</title>
+  <link rel="stylesheet" href="/css/main.css?v=5.1">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="app-header__inner">
+        <img class="app-logo" src="/images/logo.png"
+             alt="TechCPR Computer Repairs and IT Services">
+      </div>
+    </header>
+
+    <main class="app-main">
+      <section id="dashboard-login">
+        <div class="page-heading">
+          <div class="icon-badge" aria-hidden="true">▦</div>
+          <h1>Operations Dashboard</h1>
+          <p>Secure access to live WiFi business and system information.</p>
+        </div>
+
+        <section class="panel dashboard-login-card">
+          <label for="dashboard-password">Administrator Password</label>
+          <div class="field">
+            <span class="field__icon" aria-hidden="true">🔒</span>
+            <input class="input" id="dashboard-password" type="password"
+                   autocomplete="current-password"
+                   placeholder="Enter admin password">
+          </div>
+          <button class="button" id="dashboard-login-button" type="button">
+            Sign In
+          </button>
+          <p id="dashboard-login-message" class="status-message"></p>
+        </section>
+      </section>
+
+      <section id="dashboard-content" class="operations-dashboard" hidden>
+        <div class="operations-topbar">
+          <div>
+            <h1>Operations Dashboard</h1>
+            <p id="dashboard-updated">Loading current information…</p>
+          </div>
+          <div class="operations-actions">
+            <a class="button button--secondary action-link" href="/admin.html">
+              Customers
+            </a>
+            <a class="button button--secondary action-link" href="/status.html">
+              System Status
+            </a>
+            <button class="button button--secondary" id="dashboard-refresh"
+                    type="button">Refresh</button>
+            <button class="button button--danger" id="dashboard-signout"
+                    type="button">Sign Out</button>
+          </div>
+        </div>
+
+        <section class="metric-grid operations-metrics">
+          <article class="panel metric-card">
+            <div class="metric-card__icon">＄</div>
+            <div>
+              <div class="metric-card__label">Revenue Today</div>
+              <div id="revenue-today" class="metric-card__value">$0.00</div>
+            </div>
+          </article>
+          <article class="panel metric-card">
+            <div class="metric-card__icon">⌁</div>
+            <div>
+              <div class="metric-card__label">Active Customers</div>
+              <div id="active-customers" class="metric-card__value">0</div>
+            </div>
+          </article>
+          <article class="panel metric-card">
+            <div class="metric-card__icon">◷</div>
+            <div>
+              <div class="metric-card__label">Expiring in 24 Hours</div>
+              <div id="expiring-soon" class="metric-card__value">0</div>
+            </div>
+          </article>
+          <article class="panel metric-card">
+            <div class="metric-card__icon">👥</div>
+            <div>
+              <div class="metric-card__label">Total Customers</div>
+              <div id="total-customers" class="metric-card__value">0</div>
+            </div>
+          </article>
+        </section>
+
+        <section class="operations-grid">
+          <article class="panel operations-panel">
+            <div class="operations-panel__header">
+              <div>
+                <h2>System Health</h2>
+                <p>Current application and gateway status.</p>
+              </div>
+            </div>
+            <div class="system-list">
+              <div class="system-row">
+                <span>Server</span><span id="system-server" class="badge">Checking</span>
+              </div>
+              <div class="system-row">
+                <span>Database</span><span id="system-database" class="badge">Checking</span>
+              </div>
+              <div class="system-row">
+                <span>Stripe</span><span id="system-stripe" class="badge">Checking</span>
+              </div>
+              <div class="system-row">
+                <span>MikroTik</span><span id="system-mikrotik" class="badge">Checking</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="panel operations-panel recent-sales-panel">
+            <div class="operations-panel__header">
+              <div>
+                <h2>Recent Purchases</h2>
+                <p>Latest WiFi access transactions.</p>
+              </div>
+            </div>
+            <div id="recent-purchases" class="recent-purchases">
+              <div class="recent-empty">Loading purchases…</div>
+            </div>
+          </article>
+        </section>
+
+        <p id="dashboard-message" class="status-message"></p>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      Need help? Contact
+      <a href="mailto:TechCPRSupport@gmail.com">TechCPRSupport@gmail.com</a>
+    </footer>
+  </div>
+
+  <script src="/js/common.js" defer></script>
+  <script src="/js/dashboard.js" defer></script>
+</body>
+</html>

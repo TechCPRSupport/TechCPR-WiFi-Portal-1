@@ -328,6 +328,110 @@ app.post("/api/admin/login", (req, res) => {
   });
 });
 
+
+app.get("/api/admin/dashboard", requireAdmin, async (req, res) => {
+  try {
+    await markExpiredUsers();
+
+    const now = new Date();
+    const dayStart = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate()
+    ).toISOString();
+    const dayEnd = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + 1
+    ).toISOString();
+    const expiringBefore = new Date(
+      now.getTime() + 24 * 60 * 60 * 1000
+    ).toISOString();
+
+    const [
+      totalRow,
+      activeRow,
+      expiringRow,
+      paidTodayRows,
+      recentPurchases
+    ] = await Promise.all([
+      db.get("SELECT COUNT(*) AS count FROM wifi_users"),
+      db.get(
+        "SELECT COUNT(*) AS count FROM wifi_users WHERE wifi_status = 'Active'"
+      ),
+      db.get(
+        `SELECT COUNT(*) AS count
+         FROM wifi_users
+         WHERE expires > ?
+           AND expires <= ?
+           AND wifi_status = 'Active'`,
+        [now.toISOString(), expiringBefore]
+      ),
+      db.all(
+        `SELECT plan
+         FROM wifi_users
+         WHERE payment_status = 'Paid'
+           AND created >= ?
+           AND created < ?`,
+        [dayStart, dayEnd]
+      ),
+      db.all(
+        `SELECT
+           email,
+           plan,
+           created,
+           expires,
+           payment_status,
+           wifi_status,
+           mikrotik_status
+         FROM wifi_users
+         ORDER BY created DESC
+         LIMIT 6`
+      )
+    ]);
+
+    const priceByPlan = new Map([
+      [plans.day.displayName, plans.day.amount],
+      [plans.week.displayName, plans.week.amount],
+      [plans.month.displayName, plans.month.amount]
+    ]);
+
+    const revenueTodayCents = paidTodayRows.reduce(
+      (total, row) => total + (priceByPlan.get(row.plan) || 0),
+      0
+    );
+
+    const system = {
+      server: "ok",
+      database: "ok",
+      stripe: process.env.STRIPE_SECRET_KEY ? "configured" : "not configured",
+      mikrotik: "unknown"
+    };
+
+    try {
+      const router = await mikrotik.testConnection();
+      system.mikrotik = router.identity || "connected";
+    } catch {
+      system.mikrotik = "unavailable";
+    }
+
+    return res.json({
+      metrics: {
+        revenueTodayCents,
+        totalCustomers: Number(totalRow?.count || 0),
+        activeCustomers: Number(activeRow?.count || 0),
+        expiringSoon: Number(expiringRow?.count || 0)
+      },
+      system,
+      recentPurchases,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error("Admin dashboard lookup failed:", error);
+    return res.status(500).json({ error: "Unable to load dashboard." });
+  }
+});
+
 app.get("/api/admin/users", requireAdmin, async (req, res) => {
   try {
     await markExpiredUsers();
