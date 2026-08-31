@@ -253,3 +253,131 @@
   }
 }
 
+/* RC5.2 Customer Management */
+.admin-link{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  text-decoration:none;
+}
+
+.manual-customer-panel{
+  margin-bottom:10px;
+  padding:12px;
+}
+
+.manual-customer-panel__header{
+  margin-bottom:9px;
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+}
+
+.manual-customer-panel__header h2{
+  margin:0 0 2px;
+  font-size:1rem;
+}
+
+.manual-customer-panel__header p{
+  margin:0;
+  color:var(--color-muted);
+  font-size:.76rem;
+}
+
+.icon-button{
+  width:30px;
+  height:30px;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:8px;
+  color:var(--color-text);
+  background:rgba(255,255,255,.05);
+  cursor:pointer;
+  font-size:1.1rem;
+}
+
+.manual-customer-grid{
+  display:grid;
+  grid-template-columns:minmax(260px,1fr) 180px 155px;
+  gap:8px;
+}
+
+.manual-result{
+  margin-top:9px;
+  padding:9px 11px;
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px 12px;
+  border:1px solid rgba(63,226,125,.22);
+  border-radius:10px;
+  background:rgba(63,226,125,.06);
+  font-size:.78rem;
+}
+
+.manual-result strong{
+  color:var(--color-success);
+}
+
+.admin-table--actions{
+  min-width:1080px;
+}
+
+.customer-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:5px;
+}
+
+.mini-button{
+  min-height:28px;
+  padding:0 8px;
+  border-radius:7px;
+  cursor:pointer;
+  color:var(--color-text);
+  font-size:.68rem;
+  font-weight:800;
+}
+
+.admin-dialog{
+  width:min(430px,92vw);
+  padding:0;
+  border:1px solid var(--color-border);
+  border-radius:var(--radius-lg);
+  color:var(--color-text);
+  background:#06182d;
+  box-shadow:var(--shadow-panel);
+}
+
+.admin-dialog::backdrop{
+  background:rgba(0,0,0,.72);
+}
+
+.admin-dialog__content{
+  padding:18px;
+}
+
+.admin-dialog__content h2{
+  margin:0 0 5px;
+  font-size:1.15rem;
+}
+
+.admin-dialog__content p{
+  margin:0 0 12px;
+  color:var(--color-muted);
+  font-size:.78rem;
+  line-height:1.35;
+}
+
+.admin-dialog__actions{
+  margin-top:12px;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+}
+
+@media(max-width:880px){
+  .manual-customer-grid{
+    grid-template-columns:1fr;
+  }
+}
+

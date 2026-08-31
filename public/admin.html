@@ -3,58 +3,55 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>TechCPR WiFi Administration</title>
-  <link rel="stylesheet" href="/css/main.css?v=4.3">
+  <title>TechCPR Customer Management</title>
+  <link rel="stylesheet" href="/css/main.css?v=5.2">
 </head>
 <body>
   <div class="app-shell">
     <header class="app-header">
       <div class="app-header__inner">
-        <img
-          class="app-logo"
-          src="/images/logo.png"
-          alt="TechCPR Computer Repairs and IT Services"
-        >
+        <img class="app-logo" src="/images/logo.png"
+             alt="TechCPR Computer Repairs and IT Services">
       </div>
     </header>
 
     <main class="app-main">
       <section id="login-panel">
-        <div class="page-heading" aria-labelledby="login-title">
+        <div class="page-heading">
           <div class="icon-badge" aria-hidden="true">🔒</div>
-          <h1 id="login-title">WiFi Administration</h1>
-          <p>Sign in to review customers and system activity.</p>
+          <h1>WiFi Administration</h1>
+          <p>Sign in to manage customer access.</p>
         </div>
 
         <section class="panel admin-login">
           <label class="admin-login__label" for="admin-password">
             Administrator Password
           </label>
-
           <div class="field">
             <span class="field__icon" aria-hidden="true">🔒</span>
-            <input
-              class="input"
-              id="admin-password"
-              type="password"
-              autocomplete="current-password"
-              placeholder="Enter admin password"
-            >
+            <input class="input" id="admin-password" type="password"
+                   autocomplete="current-password"
+                   placeholder="Enter admin password">
           </div>
-
           <button class="button" id="login-button" type="button">Sign In</button>
-          <p id="login-message" class="status-message" role="status" aria-live="polite"></p>
+          <p id="login-message" class="status-message"></p>
         </section>
       </section>
 
       <section id="dashboard" class="admin-dashboard" hidden>
         <div class="admin-topbar">
           <div>
-            <h1>Customer Dashboard</h1>
-            <p>Review purchases, account status, and MikroTik provisioning.</p>
+            <h1>Customer Management</h1>
+            <p>Create, extend, suspend, reactivate, and remove WiFi accounts.</p>
           </div>
 
           <div class="admin-topbar__actions">
+            <a class="button button--secondary admin-link" href="/dashboard.html">
+              Dashboard
+            </a>
+            <button id="new-customer-button" class="button" type="button">
+              + Customer
+            </button>
             <button id="refresh-button" class="button button--secondary" type="button">
               Refresh
             </button>
@@ -64,70 +61,80 @@
           </div>
         </div>
 
-        <section class="metric-grid" aria-label="Customer summary">
+        <section class="metric-grid">
           <article class="panel metric-card">
-            <div class="metric-card__icon" aria-hidden="true">👥</div>
-            <div>
-              <div class="metric-card__label">Total Customers</div>
-              <div id="metric-total" class="metric-card__value">0</div>
-            </div>
+            <div class="metric-card__icon">👥</div>
+            <div><div class="metric-card__label">Total Customers</div>
+            <div id="metric-total" class="metric-card__value">0</div></div>
           </article>
-
           <article class="panel metric-card">
-            <div class="metric-card__icon" aria-hidden="true">⌁</div>
-            <div>
-              <div class="metric-card__label">Active Accounts</div>
-              <div id="metric-active" class="metric-card__value">0</div>
-            </div>
+            <div class="metric-card__icon">⌁</div>
+            <div><div class="metric-card__label">Active Accounts</div>
+            <div id="metric-active" class="metric-card__value">0</div></div>
           </article>
-
           <article class="panel metric-card">
-            <div class="metric-card__icon" aria-hidden="true">◷</div>
-            <div>
-              <div class="metric-card__label">Expiring in 24 Hours</div>
-              <div id="metric-expiring" class="metric-card__value">0</div>
-            </div>
+            <div class="metric-card__icon">◷</div>
+            <div><div class="metric-card__label">Expiring in 24 Hours</div>
+            <div id="metric-expiring" class="metric-card__value">0</div></div>
           </article>
-
           <article class="panel metric-card">
-            <div class="metric-card__icon" aria-hidden="true">▰</div>
-            <div>
-              <div class="metric-card__label">Paid Records</div>
-              <div id="metric-paid" class="metric-card__value">0</div>
-            </div>
+            <div class="metric-card__icon">⏸</div>
+            <div><div class="metric-card__label">Suspended</div>
+            <div id="metric-suspended" class="metric-card__value">0</div></div>
           </article>
         </section>
 
-        <section class="panel admin-controls" aria-label="Customer filters">
-          <div class="field">
-            <span class="field__icon" aria-hidden="true">⌕</span>
-            <input
-              class="input"
-              id="search"
-              type="search"
-              placeholder="Search email, plan, username, or status"
-            >
+        <section id="manual-panel" class="panel manual-customer-panel" hidden>
+          <div class="manual-customer-panel__header">
+            <div>
+              <h2>Create Customer</h2>
+              <p>Create an account without a Stripe purchase.</p>
+            </div>
+            <button id="close-manual-button" class="icon-button" type="button">×</button>
           </div>
+          <div class="manual-customer-grid">
+            <div class="field">
+              <span class="field__icon">✉</span>
+              <input id="manual-email" class="input" type="email"
+                     placeholder="Customer email">
+            </div>
+            <select id="manual-plan" class="select">
+              <option value="day">1 Day</option>
+              <option value="week">7 Days</option>
+              <option value="month">1 Month</option>
+            </select>
+            <button id="create-customer-button" class="button" type="button">
+              Create Account
+            </button>
+          </div>
+          <div id="manual-result" class="manual-result" hidden></div>
+        </section>
 
-          <select id="plan-filter" class="select" aria-label="Filter by plan">
+        <section class="panel admin-controls">
+          <div class="field">
+            <span class="field__icon">⌕</span>
+            <input class="input" id="search" type="search"
+                   placeholder="Search email, plan, username, or status">
+          </div>
+          <select id="plan-filter" class="select">
             <option value="">All plans</option>
             <option value="1 day">1 Day</option>
             <option value="7 days">7 Days</option>
             <option value="1 month">1 Month</option>
           </select>
-
-          <select id="status-filter" class="select" aria-label="Filter by WiFi status">
-            <option value="">All WiFi statuses</option>
+          <select id="status-filter" class="select">
+            <option value="">All statuses</option>
             <option value="active">Active</option>
-            <option value="pending">Pending</option>
+            <option value="suspended">Suspended</option>
             <option value="expired">Expired</option>
+            <option value="pending">Pending</option>
             <option value="provisioning error">Provisioning Error</option>
           </select>
         </section>
 
         <section class="panel admin-table-panel">
           <div class="admin-table-scroll">
-            <table class="admin-table">
+            <table class="admin-table admin-table--actions">
               <thead>
                 <tr>
                   <th>Email</th>
@@ -137,20 +144,20 @@
                   <th>Payment</th>
                   <th>WiFi</th>
                   <th>MikroTik</th>
-                  <th>Created</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="users-body">
-                <tr>
-                  <td class="admin-table__empty" colspan="8">Sign in to load customer records.</td>
-                </tr>
+                <tr><td class="admin-table__empty" colspan="8">
+                  Sign in to load customer records.
+                </td></tr>
               </tbody>
             </table>
           </div>
           <div id="record-count" class="admin-record-count">Showing 0 of 0 record(s)</div>
         </section>
 
-        <p id="admin-message" class="status-message" role="status" aria-live="polite"></p>
+        <p id="admin-message" class="status-message"></p>
       </section>
     </main>
 
@@ -159,6 +166,24 @@
       <a href="mailto:TechCPRSupport@gmail.com">TechCPRSupport@gmail.com</a>
     </footer>
   </div>
+
+  <dialog id="extend-dialog" class="admin-dialog">
+    <form method="dialog" class="admin-dialog__content">
+      <h2>Extend Customer Access</h2>
+      <p id="extend-customer-name"></p>
+      <select id="extend-plan" class="select">
+        <option value="day">Add 1 Day</option>
+        <option value="week">Add 7 Days</option>
+        <option value="month">Add 1 Month</option>
+      </select>
+      <div class="admin-dialog__actions">
+        <button class="button button--secondary" value="cancel">Cancel</button>
+        <button id="confirm-extend-button" class="button" value="default" type="button">
+          Extend Access
+        </button>
+      </div>
+    </form>
+  </dialog>
 
   <script src="/js/common.js" defer></script>
   <script src="/js/admin.js" defer></script>

@@ -1,6 +1,7 @@
 const express = require("express");
 const Stripe = require("stripe");
 const path = require("path");
+const crypto = require("crypto");
 require("dotenv").config();
 
 const db = require("./database");
@@ -69,13 +70,37 @@ function requireAdmin(req, res, next) {
 
 async function markExpiredUsers() {
   try {
-    await db.run(
-      `UPDATE wifi_users
-       SET wifi_status = 'Expired'
+    const now = new Date().toISOString();
+    const expiredUsers = await db.all(
+      `SELECT id, username
+       FROM wifi_users
        WHERE expires <= ?
          AND wifi_status = 'Active'`,
-      [new Date().toISOString()]
+      [now]
     );
+
+    for (const user of expiredUsers) {
+      let mikrotikStatus = "Expired";
+
+      try {
+        const result = await mikrotik.disableWifiUser(user.username);
+        mikrotikStatus = result.missing ? "Missing" : "Disabled";
+      } catch (error) {
+        mikrotikStatus = `Disable Error: ${error.message}`.slice(0, 250);
+        console.error(
+          `Unable to disable expired MikroTik user ${user.username}:`,
+          error.message
+        );
+      }
+
+      await db.run(
+        `UPDATE wifi_users
+         SET wifi_status = 'Expired',
+             mikrotik_status = ?
+         WHERE id = ?`,
+        [mikrotikStatus, user.id]
+      );
+    }
   } catch (error) {
     console.error("Expiration update failed:", error.message);
   }
@@ -429,6 +454,269 @@ app.get("/api/admin/dashboard", requireAdmin, async (req, res) => {
   } catch (error) {
     console.error("Admin dashboard lookup failed:", error);
     return res.status(500).json({ error: "Unable to load dashboard." });
+  }
+});
+
+
+app.post("/api/admin/users/manual", requireAdmin, async (req, res) => {
+  const email = normalizeEmail(req.body?.email);
+  const planKey = String(req.body?.plan || "");
+  const selectedPlan = plans[planKey];
+
+  if (!isValidEmail(email)) {
+    return res.status(400).json({ error: "Enter a valid customer email." });
+  }
+
+  if (!selectedPlan) {
+    return res.status(400).json({ error: "Select a valid access plan." });
+  }
+
+  const created = new Date();
+  const expires = new Date(created.getTime() + selectedPlan.durationMs);
+  const username = `CPR${createCode(5)}`;
+  const password = createCode(8);
+  const manualSession = `manual:${crypto.randomUUID()}`;
+
+  try {
+    await mikrotik.createWifiUser({
+      username,
+      password,
+      profile: selectedPlan.profile,
+      comment: `TechCPR manual ${selectedPlan.displayName} - ${email}`
+    });
+
+    try {
+      const result = await db.run(
+        `INSERT INTO wifi_users (
+           email,
+           plan,
+           username,
+           password,
+           expires,
+           created,
+           stripe_session,
+           stripe_payment_intent,
+           payment_status,
+           wifi_status,
+           mikrotik_status
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          email,
+          selectedPlan.displayName,
+          username,
+          password,
+          expires.toISOString(),
+          created.toISOString(),
+          manualSession,
+          null,
+          "Manual",
+          "Active",
+          "Created"
+        ]
+      );
+
+      return res.status(201).json({
+        success: true,
+        id: result.id,
+        email,
+        plan: selectedPlan.displayName,
+        username,
+        password,
+        expires: expires.toISOString()
+      });
+    } catch (databaseError) {
+      try {
+        await mikrotik.removeWifiUser(username);
+      } catch (rollbackError) {
+        console.error(
+          `Manual account rollback failed for ${username}:`,
+          rollbackError.message
+        );
+      }
+
+      throw databaseError;
+    }
+  } catch (error) {
+    console.error("Manual customer creation failed:", error);
+    return res.status(500).json({
+      error: error.message || "Unable to create customer."
+    });
+  }
+});
+
+app.post("/api/admin/users/:id/extend", requireAdmin, async (req, res) => {
+  const userId = Number(req.params.id);
+  const planKey = String(req.body?.plan || "");
+  const selectedPlan = plans[planKey];
+
+  if (!Number.isInteger(userId) || userId <= 0) {
+    return res.status(400).json({ error: "Invalid customer ID." });
+  }
+
+  if (!selectedPlan) {
+    return res.status(400).json({ error: "Select a valid extension plan." });
+  }
+
+  try {
+    const user = await db.get(
+      `SELECT id, email, username, password, expires
+       FROM wifi_users
+       WHERE id = ?`,
+      [userId]
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: "Customer not found." });
+    }
+
+    const currentExpiration = Date.parse(user.expires);
+    const baseTime = Number.isFinite(currentExpiration)
+      ? Math.max(Date.now(), currentExpiration)
+      : Date.now();
+    const newExpiration = new Date(baseTime + selectedPlan.durationMs);
+
+    try {
+      await mikrotik.enableWifiUser(user.username);
+    } catch (error) {
+      if (/does not exist/i.test(error.message)) {
+        await mikrotik.createWifiUser({
+          username: user.username,
+          password: user.password,
+          profile: selectedPlan.profile,
+          comment: `TechCPR extended ${selectedPlan.displayName} - ${user.email}`
+        });
+      } else {
+        throw error;
+      }
+    }
+
+    await db.run(
+      `UPDATE wifi_users
+       SET expires = ?,
+           wifi_status = 'Active',
+           mikrotik_status = 'Created'
+       WHERE id = ?`,
+      [newExpiration.toISOString(), userId]
+    );
+
+    return res.json({
+      success: true,
+      expires: newExpiration.toISOString()
+    });
+  } catch (error) {
+    console.error("Customer extension failed:", error);
+    return res.status(500).json({
+      error: error.message || "Unable to extend customer."
+    });
+  }
+});
+
+app.post("/api/admin/users/:id/suspend", requireAdmin, async (req, res) => {
+  const userId = Number(req.params.id);
+
+  if (!Number.isInteger(userId) || userId <= 0) {
+    return res.status(400).json({ error: "Invalid customer ID." });
+  }
+
+  try {
+    const user = await db.get(
+      "SELECT id, username FROM wifi_users WHERE id = ?",
+      [userId]
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: "Customer not found." });
+    }
+
+    const result = await mikrotik.disableWifiUser(user.username);
+
+    await db.run(
+      `UPDATE wifi_users
+       SET wifi_status = 'Suspended',
+           mikrotik_status = ?
+       WHERE id = ?`,
+      [result.missing ? "Missing" : "Disabled", userId]
+    );
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("Customer suspension failed:", error);
+    return res.status(500).json({
+      error: error.message || "Unable to suspend customer."
+    });
+  }
+});
+
+app.post("/api/admin/users/:id/reactivate", requireAdmin, async (req, res) => {
+  const userId = Number(req.params.id);
+
+  if (!Number.isInteger(userId) || userId <= 0) {
+    return res.status(400).json({ error: "Invalid customer ID." });
+  }
+
+  try {
+    const user = await db.get(
+      `SELECT id, username, expires
+       FROM wifi_users
+       WHERE id = ?`,
+      [userId]
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: "Customer not found." });
+    }
+
+    if (Date.parse(user.expires) <= Date.now()) {
+      return res.status(400).json({
+        error: "This account is expired. Extend it before reactivating."
+      });
+    }
+
+    await mikrotik.enableWifiUser(user.username);
+
+    await db.run(
+      `UPDATE wifi_users
+       SET wifi_status = 'Active',
+           mikrotik_status = 'Created'
+       WHERE id = ?`,
+      [userId]
+    );
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("Customer reactivation failed:", error);
+    return res.status(500).json({
+      error: error.message || "Unable to reactivate customer."
+    });
+  }
+});
+
+app.delete("/api/admin/users/:id", requireAdmin, async (req, res) => {
+  const userId = Number(req.params.id);
+
+  if (!Number.isInteger(userId) || userId <= 0) {
+    return res.status(400).json({ error: "Invalid customer ID." });
+  }
+
+  try {
+    const user = await db.get(
+      "SELECT id, username FROM wifi_users WHERE id = ?",
+      [userId]
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: "Customer not found." });
+    }
+
+    await mikrotik.removeWifiUser(user.username);
+    await db.run("DELETE FROM wifi_users WHERE id = ?", [userId]);
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("Customer deletion failed:", error);
+    return res.status(500).json({
+      error: error.message || "Unable to delete customer."
+    });
   }
 });
 

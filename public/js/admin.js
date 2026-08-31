@@ -18,10 +18,24 @@
   const metricTotal = document.getElementById("metric-total");
   const metricActive = document.getElementById("metric-active");
   const metricExpiring = document.getElementById("metric-expiring");
-  const metricPaid = document.getElementById("metric-paid");
+  const metricSuspended = document.getElementById("metric-suspended");
+
+  const manualPanel = document.getElementById("manual-panel");
+  const newCustomerButton = document.getElementById("new-customer-button");
+  const closeManualButton = document.getElementById("close-manual-button");
+  const manualEmail = document.getElementById("manual-email");
+  const manualPlan = document.getElementById("manual-plan");
+  const createCustomerButton = document.getElementById("create-customer-button");
+  const manualResult = document.getElementById("manual-result");
+
+  const extendDialog = document.getElementById("extend-dialog");
+  const extendCustomerName = document.getElementById("extend-customer-name");
+  const extendPlan = document.getElementById("extend-plan");
+  const confirmExtendButton = document.getElementById("confirm-extend-button");
 
   let adminPassword = "";
   let users = [];
+  let extendingUserId = null;
 
   loginButton.addEventListener("click", login);
   passwordInput.addEventListener("keydown", event => {
@@ -32,6 +46,17 @@
   searchInput.addEventListener("input", render);
   planFilter.addEventListener("change", render);
   statusFilter.addEventListener("change", render);
+
+  newCustomerButton.addEventListener("click", () => {
+    manualPanel.hidden = false;
+    manualEmail.focus();
+  });
+  closeManualButton.addEventListener("click", () => {
+    manualPanel.hidden = true;
+    manualResult.hidden = true;
+  });
+  createCustomerButton.addEventListener("click", createManualCustomer);
+  confirmExtendButton.addEventListener("click", extendCustomer);
 
   async function login() {
     const password = passwordInput.value;
@@ -51,7 +76,6 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password })
       });
-
       const data = await response.json();
 
       if (!response.ok || !data.success) {
@@ -59,7 +83,6 @@
       }
 
       adminPassword = password;
-      loginMessage.textContent = "";
       loginPanel.hidden = true;
       dashboard.hidden = false;
       await loadUsers();
@@ -77,11 +100,27 @@
     passwordInput.value = "";
     dashboard.hidden = true;
     loginPanel.hidden = false;
-    usersBody.replaceChildren();
-    searchInput.value = "";
-    planFilter.value = "";
-    statusFilter.value = "";
+    manualPanel.hidden = true;
     passwordInput.focus();
+  }
+
+  async function api(path, options = {}) {
+    const response = await fetch(path, {
+      ...options,
+      headers: {
+        "x-admin-password": adminPassword,
+        ...(options.body ? { "Content-Type": "application/json" } : {}),
+        ...(options.headers || {})
+      }
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Request failed.");
+    }
+
+    return data;
   }
 
   async function loadUsers() {
@@ -90,27 +129,13 @@
     TechCPR.setMessage(adminMessage, "Loading customer records…");
 
     try {
-      const response = await fetch("/api/admin/users", {
-        headers: { "x-admin-password": adminPassword },
-        cache: "no-store"
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Unable to load customers.");
-      }
-
-      users = Array.isArray(data) ? data : [];
+      users = await api("/api/admin/users", { cache: "no-store" });
+      users = Array.isArray(users) ? users : [];
       updateMetrics();
       render();
       TechCPR.setMessage(adminMessage, `Loaded ${users.length} customer record(s).`);
     } catch (error) {
-      TechCPR.setMessage(
-        adminMessage,
-        error.message || "Unable to load customers.",
-        "error"
-      );
+      TechCPR.setMessage(adminMessage, error.message, "error");
     } finally {
       refreshButton.disabled = false;
       refreshButton.textContent = "Refresh";
@@ -121,48 +146,37 @@
     const now = Date.now();
     const next24Hours = now + 24 * 60 * 60 * 1000;
 
-    const active = users.filter(user =>
-      String(user.wifi_status || "").toLowerCase() === "active"
+    metricTotal.textContent = users.length;
+    metricActive.textContent = users.filter(user =>
+      normalize(user.wifi_status) === "active"
     ).length;
-
-    const expiring = users.filter(user => {
+    metricSuspended.textContent = users.filter(user =>
+      normalize(user.wifi_status) === "suspended"
+    ).length;
+    metricExpiring.textContent = users.filter(user => {
       const expires = Date.parse(user.expires);
       return Number.isFinite(expires) && expires > now && expires <= next24Hours;
     }).length;
-
-    const paid = users.filter(user =>
-      String(user.payment_status || "").toLowerCase() === "paid"
-    ).length;
-
-    metricTotal.textContent = users.length;
-    metricActive.textContent = active;
-    metricExpiring.textContent = expiring;
-    metricPaid.textContent = paid;
   }
 
   function render() {
-    const query = searchInput.value.trim().toLowerCase();
-    const selectedPlan = planFilter.value.toLowerCase();
-    const selectedStatus = statusFilter.value.toLowerCase();
+    const query = normalize(searchInput.value);
+    const selectedPlan = normalize(planFilter.value);
+    const selectedStatus = normalize(statusFilter.value);
 
     const filtered = users.filter(user => {
-      const searchText = [
+      const searchText = normalize([
         user.email,
         user.plan,
         user.username,
         user.payment_status,
         user.wifi_status,
         user.mikrotik_status
-      ].join(" ").toLowerCase();
+      ].join(" "));
 
-      const matchesQuery = !query || searchText.includes(query);
-      const matchesPlan =
-        !selectedPlan || String(user.plan || "").toLowerCase() === selectedPlan;
-      const matchesStatus =
-        !selectedStatus ||
-        String(user.wifi_status || "").toLowerCase() === selectedStatus;
-
-      return matchesQuery && matchesPlan && matchesStatus;
+      return (!query || searchText.includes(query)) &&
+        (!selectedPlan || normalize(user.plan) === selectedPlan) &&
+        (!selectedStatus || normalize(user.wifi_status) === selectedStatus);
     });
 
     if (!filtered.length) {
@@ -184,7 +198,6 @@
 
   function createRow(user) {
     const row = document.createElement("tr");
-
     row.append(
       textCell(user.email, "admin-table__email"),
       textCell(user.plan),
@@ -193,10 +206,157 @@
       badgeCell(user.payment_status),
       badgeCell(user.wifi_status),
       badgeCell(user.mikrotik_status),
-      textCell(TechCPR.formatDate(user.created))
+      actionCell(user)
+    );
+    return row;
+  }
+
+  function actionCell(user) {
+    const cell = document.createElement("td");
+    const group = document.createElement("div");
+    group.className = "customer-actions";
+
+    group.append(
+      actionButton("Extend", "button--secondary", () => openExtend(user))
     );
 
-    return row;
+    const status = normalize(user.wifi_status);
+
+    if (status === "active") {
+      group.append(
+        actionButton("Suspend", "button--secondary", () => suspendUser(user))
+      );
+    } else if (status === "suspended" && Date.parse(user.expires) > Date.now()) {
+      group.append(
+        actionButton("Activate", "button--secondary", () => reactivateUser(user))
+      );
+    }
+
+    group.append(
+      actionButton("Delete", "button--danger", () => deleteUser(user))
+    );
+
+    cell.append(group);
+    return cell;
+  }
+
+  function actionButton(label, className, handler) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `mini-button ${className}`;
+    button.textContent = label;
+    button.addEventListener("click", handler);
+    return button;
+  }
+
+  function openExtend(user) {
+    extendingUserId = user.id;
+    extendCustomerName.textContent =
+      `${user.email} • ${user.username} • expires ${TechCPR.formatDate(user.expires)}`;
+    extendPlan.value = "day";
+    extendDialog.showModal();
+  }
+
+  async function extendCustomer() {
+    if (!extendingUserId) return;
+
+    confirmExtendButton.disabled = true;
+    confirmExtendButton.textContent = "Extending…";
+
+    try {
+      await api(`/api/admin/users/${extendingUserId}/extend`, {
+        method: "POST",
+        body: JSON.stringify({ plan: extendPlan.value })
+      });
+      extendDialog.close();
+      TechCPR.setMessage(adminMessage, "Customer access extended.");
+      await loadUsers();
+    } catch (error) {
+      TechCPR.setMessage(adminMessage, error.message, "error");
+    } finally {
+      confirmExtendButton.disabled = false;
+      confirmExtendButton.textContent = "Extend Access";
+      extendingUserId = null;
+    }
+  }
+
+  async function suspendUser(user) {
+    if (!confirm(`Suspend WiFi access for ${user.email}?`)) return;
+
+    try {
+      await api(`/api/admin/users/${user.id}/suspend`, { method: "POST" });
+      TechCPR.setMessage(adminMessage, "Customer suspended.");
+      await loadUsers();
+    } catch (error) {
+      TechCPR.setMessage(adminMessage, error.message, "error");
+    }
+  }
+
+  async function reactivateUser(user) {
+    try {
+      await api(`/api/admin/users/${user.id}/reactivate`, { method: "POST" });
+      TechCPR.setMessage(adminMessage, "Customer reactivated.");
+      await loadUsers();
+    } catch (error) {
+      TechCPR.setMessage(adminMessage, error.message, "error");
+    }
+  }
+
+  async function deleteUser(user) {
+    const confirmed = confirm(
+      `Permanently delete ${user.email} and remove ${user.username} from the router?`
+    );
+    if (!confirmed) return;
+
+    try {
+      await api(`/api/admin/users/${user.id}`, { method: "DELETE" });
+      TechCPR.setMessage(adminMessage, "Customer deleted.");
+      await loadUsers();
+    } catch (error) {
+      TechCPR.setMessage(adminMessage, error.message, "error");
+    }
+  }
+
+  async function createManualCustomer() {
+    const email = manualEmail.value.trim();
+
+    if (!email) {
+      TechCPR.setMessage(adminMessage, "Enter a customer email.", "error");
+      return;
+    }
+
+    createCustomerButton.disabled = true;
+    createCustomerButton.textContent = "Creating…";
+
+    try {
+      const data = await api("/api/admin/users/manual", {
+        method: "POST",
+        body: JSON.stringify({
+          email,
+          plan: manualPlan.value
+        })
+      });
+
+      manualResult.hidden = false;
+      manualResult.innerHTML = "";
+
+      const title = document.createElement("strong");
+      title.textContent = "Account created";
+
+      const details = document.createElement("span");
+      details.textContent =
+        `Username: ${data.username} • Password: ${data.password} • Expires: ${TechCPR.formatDate(data.expires)}`;
+
+      manualResult.append(title, details);
+      manualEmail.value = "";
+      TechCPR.setMessage(adminMessage, "Manual customer created.");
+      await loadUsers();
+    } catch (error) {
+      TechCPR.setMessage(adminMessage, error.message, "error");
+    } finally {
+      createCustomerButton.disabled = false;
+      createCustomerButton.textContent = "Create Account";
+    }
   }
 
   function textCell(value, className = "") {
@@ -210,7 +370,7 @@
   function badgeCell(value) {
     const cell = document.createElement("td");
     const badge = document.createElement("span");
-    const normalized = String(value || "").toLowerCase();
+    const normalized = normalize(value);
 
     badge.className = `badge ${badgeClass(normalized)}`;
     badge.textContent = value || "Unknown";
@@ -219,14 +379,22 @@
   }
 
   function badgeClass(value) {
-    if (["paid", "active", "created", "ok", "connected"].some(word => value.includes(word))) {
+    if (["paid", "manual", "active", "created", "ok", "connected"].some(word =>
+      value.includes(word)
+    )) {
       return "badge--success";
     }
 
-    if (["error", "expired", "failed", "unavailable"].some(word => value.includes(word))) {
+    if (["error", "expired", "failed", "unavailable"].some(word =>
+      value.includes(word)
+    )) {
       return "badge--danger";
     }
 
     return "badge--warning";
+  }
+
+  function normalize(value) {
+    return String(value || "").trim().toLowerCase();
   }
 })();
