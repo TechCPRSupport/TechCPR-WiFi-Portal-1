@@ -45,7 +45,7 @@ if (source.includes(incorrectPatch)) {
   source = source.replace(incorrectPatch, correctedPatch);
   fs.writeFileSync(channelPath, source, "utf8");
   console.log(
-    "Corrected node-routeros RouterOS 7 !empty handling (RC5.4.1)."
+    "Corrected node-routeros RouterOS 7 !empty handling."
   );
   process.exit(0);
 }
@@ -80,5 +80,5 @@ source = source.replace(
 fs.writeFileSync(channelPath, source, "utf8");
 
 console.log(
-  "Applied node-routeros RouterOS 7 !empty compatibility patch (RC5.4.1)."
+  "Applied node-routeros RouterOS 7 !empty compatibility patch."
 );
