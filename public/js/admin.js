@@ -32,6 +32,7 @@
   const extendCustomerName = document.getElementById("extend-customer-name");
   const extendPlan = document.getElementById("extend-plan");
   const confirmExtendButton = document.getElementById("confirm-extend-button");
+  const extendMessage = document.getElementById("extend-message");
 
   let adminPassword = "";
   let users = [];
@@ -57,6 +58,11 @@
   });
   createCustomerButton.addEventListener("click", createManualCustomer);
   confirmExtendButton.addEventListener("click", extendCustomer);
+  extendDialog.addEventListener("close", () => {
+    extendingUserId = null;
+    extendMessage.textContent = "";
+    extendMessage.className = "dialog-message";
+  });
 
   async function login() {
     const password = passwordInput.value;
@@ -254,29 +260,59 @@
     extendCustomerName.textContent =
       `${user.email} • ${user.username} • expires ${TechCPR.formatDate(user.expires)}`;
     extendPlan.value = "day";
+    extendMessage.textContent = "";
+    extendMessage.className = "dialog-message";
     extendDialog.showModal();
   }
 
   async function extendCustomer() {
-    if (!extendingUserId) return;
+    if (!extendingUserId) {
+      extendMessage.textContent = "No customer is selected.";
+      extendMessage.className = "dialog-message dialog-message--error";
+      return;
+    }
 
     confirmExtendButton.disabled = true;
     confirmExtendButton.textContent = "Extending…";
+    extendMessage.textContent = "Updating expiration and synchronizing the router…";
+    extendMessage.className = "dialog-message";
 
     try {
-      await api(`/api/admin/users/${extendingUserId}/extend`, {
+      const result = await api(`/api/admin/users/${extendingUserId}/extend`, {
         method: "POST",
         body: JSON.stringify({ plan: extendPlan.value })
       });
-      extendDialog.close();
-      TechCPR.setMessage(adminMessage, "Customer access extended.");
+
+      if (result.warning) {
+        extendMessage.textContent =
+          `Expiration was extended, but MikroTik sync needs attention: ${result.warning}`;
+        extendMessage.className = "dialog-message dialog-message--warning";
+        TechCPR.setMessage(
+          adminMessage,
+          "Access time extended, but MikroTik provisioning needs attention.",
+          "error"
+        );
+        await loadUsers();
+        return;
+      }
+
+      extendMessage.textContent =
+        `Access extended through ${TechCPR.formatDate(result.expires)}.`;
+      extendMessage.className = "dialog-message dialog-message--success";
+
       await loadUsers();
+
+      setTimeout(() => {
+        extendDialog.close();
+        extendingUserId = null;
+        TechCPR.setMessage(adminMessage, "Customer access extended.");
+      }, 650);
     } catch (error) {
-      TechCPR.setMessage(adminMessage, error.message, "error");
+      extendMessage.textContent = error.message || "Unable to extend customer.";
+      extendMessage.className = "dialog-message dialog-message--error";
     } finally {
       confirmExtendButton.disabled = false;
       confirmExtendButton.textContent = "Extend Access";
-      extendingUserId = null;
     }
   }
 

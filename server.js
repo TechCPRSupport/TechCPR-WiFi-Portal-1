@@ -573,35 +573,67 @@ app.post("/api/admin/users/:id/extend", requireAdmin, async (req, res) => {
     const baseTime = Number.isFinite(currentExpiration)
       ? Math.max(Date.now(), currentExpiration)
       : Date.now();
+
     const newExpiration = new Date(baseTime + selectedPlan.durationMs);
+    let routerStatus = "Created";
+    let routerWarning = null;
+
+    /*
+     * Update the application database first. Extending time is an
+     * administrative action and should not silently fail just because a
+     * historical test user is missing from the router.
+     */
+    await db.run(
+      `UPDATE wifi_users
+       SET expires = ?,
+           wifi_status = 'Active',
+           mikrotik_status = 'Syncing'
+       WHERE id = ?`,
+      [newExpiration.toISOString(), userId]
+    );
 
     try {
       await mikrotik.enableWifiUser(user.username);
-    } catch (error) {
-      if (/does not exist/i.test(error.message)) {
-        await mikrotik.createWifiUser({
-          username: user.username,
-          password: user.password,
-          profile: selectedPlan.profile,
-          comment: `TechCPR extended ${selectedPlan.displayName} - ${user.email}`
-        });
+      routerStatus = "Created";
+    } catch (enableError) {
+      if (/does not exist/i.test(enableError.message)) {
+        try {
+          await mikrotik.createWifiUser({
+            username: user.username,
+            password: user.password,
+            profile: selectedPlan.profile,
+            comment: `TechCPR extended ${selectedPlan.displayName} - ${user.email}`
+          });
+          routerStatus = "Created";
+        } catch (createError) {
+          routerStatus = "Provisioning Error";
+          routerWarning = createError.message;
+        }
       } else {
-        throw error;
+        routerStatus = "Provisioning Error";
+        routerWarning = enableError.message;
       }
     }
 
     await db.run(
       `UPDATE wifi_users
-       SET expires = ?,
-           wifi_status = 'Active',
-           mikrotik_status = 'Created'
+       SET mikrotik_status = ?,
+           wifi_status = ?
        WHERE id = ?`,
-      [newExpiration.toISOString(), userId]
+      [
+        routerStatus,
+        routerStatus === "Provisioning Error" ? "Provisioning Error" : "Active",
+        userId
+      ]
     );
 
     return res.json({
       success: true,
-      expires: newExpiration.toISOString()
+      expires: newExpiration.toISOString(),
+      wifi_status:
+        routerStatus === "Provisioning Error" ? "Provisioning Error" : "Active",
+      mikrotik_status: routerStatus,
+      warning: routerWarning
     });
   } catch (error) {
     console.error("Customer extension failed:", error);

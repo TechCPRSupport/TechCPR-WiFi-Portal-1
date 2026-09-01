@@ -381,3 +381,16 @@
   }
 }
 
+
+
+/* RC5.2.1 Extend Access feedback */
+.dialog-message{
+  min-height:18px;
+  margin:10px 0 0;
+  color:var(--color-muted);
+  font-size:.76rem;
+  line-height:1.35;
+}
+.dialog-message--success{color:var(--color-success)}
+.dialog-message--warning{color:var(--color-warning)}
+.dialog-message--error{color:var(--color-danger)}
