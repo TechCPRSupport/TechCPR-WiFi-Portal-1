@@ -82,6 +82,7 @@
       setSystemBadge("system-database", data.system.database);
       setSystemBadge("system-stripe", data.system.stripe);
       setSystemBadge("system-mikrotik", data.system.mikrotik);
+      renderMaintenance(data.maintenance || {});
 
       renderRecent(data.recentPurchases || []);
       updated.textContent = `Updated ${TechCPR.formatDate(data.timestamp)}`;
@@ -116,6 +117,48 @@
 
     element.textContent = value || "Unknown";
     element.className = `badge ${healthy ? "badge--success" : "badge--warning"}`;
+  }
+
+  function renderMaintenance(maintenance) {
+    const badge = document.getElementById("system-maintenance");
+    const detail = document.getElementById("maintenance-detail");
+
+    const state = maintenance.running
+      ? "Running"
+      : maintenance.lastResult || "Waiting";
+
+    const normalized = String(state).toLowerCase();
+
+    badge.textContent = state;
+    badge.className =
+      `badge ${
+        normalized === "healthy"
+          ? "badge--success"
+          : normalized === "error"
+            ? "badge--danger"
+            : "badge--warning"
+      }`;
+
+    if (maintenance.lastRunAt) {
+      const repairText =
+        Number(maintenance.lastRepairs || 0) === 1
+          ? "1 automatic repair"
+          : `${Number(maintenance.lastRepairs || 0)} automatic repairs`;
+
+      const differenceText =
+        Number(maintenance.lastDifferences || 0) === 1
+          ? "1 remaining difference"
+          : `${Number(maintenance.lastDifferences || 0)} remaining differences`;
+
+      detail.textContent =
+        `Last cycle ${TechCPR.formatDate(maintenance.lastRunAt)} • ` +
+        `${repairText} • ${differenceText} • ` +
+        `auto-repair ${maintenance.autoRepair ? "enabled" : "disabled"}.`;
+    } else {
+      detail.textContent =
+        `Automatic lifecycle maintenance is waiting for its first cycle. ` +
+        `Auto-repair is ${maintenance.autoRepair ? "enabled" : "disabled"}.`;
+    }
   }
 
   function renderRecent(items) {

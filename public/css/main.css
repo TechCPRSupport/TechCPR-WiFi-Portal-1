@@ -600,3 +600,13 @@
   }
 }
 
+/* RC6.3 Automated Lifecycle Maintenance */
+.maintenance-detail{
+  margin-top:9px;
+  padding-top:9px;
+  border-top:1px solid rgba(255,255,255,.06);
+  color:var(--color-muted);
+  font-size:.72rem;
+  line-height:1.35;
+}
+

@@ -676,6 +676,235 @@ app.post(
   }
 );
 
+
+const MAINTENANCE_INTERVAL_MS = Math.max(
+  60_000,
+  Number(process.env.MAINTENANCE_INTERVAL_MS || 5 * 60_000)
+);
+const MAINTENANCE_MAX_REPAIRS = Math.max(
+  1,
+  Number(process.env.MAINTENANCE_MAX_REPAIRS || 10)
+);
+const MAINTENANCE_AUTO_REPAIR =
+  String(process.env.MAINTENANCE_AUTO_REPAIR || "true").toLowerCase() !== "false";
+
+const maintenanceState = {
+  running: false,
+  enabled: true,
+  autoRepair: MAINTENANCE_AUTO_REPAIR,
+  intervalMs: MAINTENANCE_INTERVAL_MS,
+  lastRunAt: null,
+  lastResult: "Waiting",
+  lastDifferences: null,
+  lastRepairs: 0,
+  lastError: null
+};
+
+async function repairManagedUserAutomatically(userId) {
+  const user = await db.get(
+    `SELECT id, email, plan, username, password, wifi_status,
+            mikrotik_status, expires
+     FROM wifi_users
+     WHERE id = ?`,
+    [userId]
+  );
+
+  if (!user) {
+    return { userId, action: "skipped-missing-database-record" };
+  }
+
+  if (!["Active", "Suspended", "Provisioning Error"].includes(user.wifi_status)) {
+    return { userId, username: user.username, action: "skipped-status" };
+  }
+
+  if (Date.parse(user.expires) <= Date.now()) {
+    return { userId, username: user.username, action: "skipped-expired" };
+  }
+
+  const routerUsers = await mikrotik.listWifiUsers();
+  const routerUser = routerUsers.find(item => item.name === user.username);
+
+  const planEntry = Object.values(plans).find(
+    plan => plan.displayName === user.plan
+  );
+
+  const profile =
+    planEntry?.profile ||
+    process.env.MIKROTIK_CUSTOMER_PROFILE ||
+    "customer";
+
+  let action = "already-correct";
+
+  if (!routerUser) {
+    await mikrotik.createWifiUser({
+      username: user.username,
+      password: user.password,
+      profile,
+      comment: `Auto-recovered by TechCPR - ${user.email}`
+    });
+
+    action = "recreated";
+
+    if (user.wifi_status === "Suspended") {
+      await mikrotik.disableWifiUser(user.username);
+      action = "recreated-disabled";
+    }
+  } else if (user.wifi_status === "Suspended" && !routerUser.disabled) {
+    await mikrotik.disableWifiUser(user.username);
+    action = "disabled";
+  } else if (
+    ["Active", "Provisioning Error"].includes(user.wifi_status) &&
+    routerUser.disabled
+  ) {
+    await mikrotik.enableWifiUser(user.username);
+    action = "enabled";
+  }
+
+  const finalWifiStatus =
+    user.wifi_status === "Suspended" ? "Suspended" : "Active";
+  const finalMikrotikStatus =
+    finalWifiStatus === "Suspended" ? "Disabled" : "Created";
+
+  await db.run(
+    `UPDATE wifi_users
+     SET wifi_status = ?,
+         mikrotik_status = ?
+     WHERE id = ?`,
+    [finalWifiStatus, finalMikrotikStatus, userId]
+  );
+
+  return {
+    userId,
+    username: user.username,
+    action,
+    wifiStatus: finalWifiStatus,
+    mikrotikStatus: finalMikrotikStatus
+  };
+}
+
+async function runMaintenanceCycle({ source = "scheduled", allowRepair = true } = {}) {
+  if (maintenanceState.running) {
+    return {
+      skipped: true,
+      reason: "Maintenance cycle already running.",
+      state: { ...maintenanceState }
+    };
+  }
+
+  maintenanceState.running = true;
+  maintenanceState.lastError = null;
+
+  const startedAt = new Date();
+
+  try {
+    await markExpiredUsers();
+
+    const before = await buildSyncStatus();
+    const repairCandidates = new Map();
+
+    for (const item of before.missingOnRouter) {
+      repairCandidates.set(item.id, item);
+    }
+
+    for (const item of before.stateMismatches) {
+      repairCandidates.set(item.id, item);
+    }
+
+    const repaired = [];
+
+    if (allowRepair && MAINTENANCE_AUTO_REPAIR) {
+      for (const userId of [...repairCandidates.keys()].slice(
+        0,
+        MAINTENANCE_MAX_REPAIRS
+      )) {
+        try {
+          const result = await repairManagedUserAutomatically(userId);
+          repaired.push(result);
+
+          logger.info("Automatic lifecycle repair completed", {
+            source,
+            userId,
+            username: result.username,
+            action: result.action
+          });
+        } catch (error) {
+          logger.error("Automatic lifecycle repair failed", {
+            source,
+            userId,
+            error
+          });
+        }
+      }
+    }
+
+    const after =
+      repaired.length > 0 ? await buildSyncStatus() : before;
+
+    const remainingDifferences =
+      after.missingOnRouter.length +
+      after.stateMismatches.length +
+      after.orphanedRouterUsers.length;
+
+    maintenanceState.lastRunAt = new Date().toISOString();
+    maintenanceState.lastRepairs = repaired.length;
+    maintenanceState.lastDifferences = remainingDifferences;
+    maintenanceState.lastResult =
+      remainingDifferences === 0 ? "Healthy" : "Review";
+
+    logger.info("Lifecycle maintenance cycle completed", {
+      source,
+      autoRepair: MAINTENANCE_AUTO_REPAIR,
+      repaired: repaired.length,
+      differences: remainingDifferences,
+      durationMs: Date.now() - startedAt.getTime()
+    });
+
+    return {
+      success: true,
+      source,
+      autoRepair: MAINTENANCE_AUTO_REPAIR,
+      repaired,
+      sync: after,
+      state: { ...maintenanceState }
+    };
+  } catch (error) {
+    maintenanceState.lastRunAt = new Date().toISOString();
+    maintenanceState.lastResult = "Error";
+    maintenanceState.lastError = error.message;
+
+    logger.error("Lifecycle maintenance cycle failed", {
+      source,
+      error
+    });
+
+    throw error;
+  } finally {
+    maintenanceState.running = false;
+  }
+}
+
+app.get("/api/admin/maintenance-status", requireAdmin, (req, res) => {
+  return res.json({
+    ...maintenanceState,
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.post("/api/admin/maintenance/run", requireAdmin, async (req, res) => {
+  try {
+    const result = await runMaintenanceCycle({
+      source: "admin",
+      allowRepair: true
+    });
+
+    return res.json(result);
+  } catch (error) {
+    return res.status(500).json({
+      error: error.message || "Unable to run lifecycle maintenance."
+    });
+  }
+});
+
 app.get("/api/admin/dashboard", requireAdmin, async (req, res) => {
   try {
     await markExpiredUsers();
@@ -770,6 +999,16 @@ app.get("/api/admin/dashboard", requireAdmin, async (req, res) => {
         expiringSoon: Number(expiringRow?.count || 0)
       },
       system,
+      maintenance: {
+        enabled: maintenanceState.enabled,
+        autoRepair: maintenanceState.autoRepair,
+        running: maintenanceState.running,
+        lastRunAt: maintenanceState.lastRunAt,
+        lastResult: maintenanceState.lastResult,
+        lastDifferences: maintenanceState.lastDifferences,
+        lastRepairs: maintenanceState.lastRepairs,
+        lastError: maintenanceState.lastError
+      },
       recentPurchases,
       timestamp: new Date().toISOString()
     });
@@ -1296,6 +1535,8 @@ app.use((error, req, res, next) => {
 
 let httpServer = null;
 let expirationTimer = null;
+let maintenanceTimer = null;
+let maintenanceInitialTimer = null;
 let shuttingDown = false;
 
 async function shutdown(reason, exitCode = 0) {
@@ -1307,6 +1548,16 @@ async function shutdown(reason, exitCode = 0) {
   if (expirationTimer) {
     clearInterval(expirationTimer);
     expirationTimer = null;
+  }
+
+  if (maintenanceTimer) {
+    clearInterval(maintenanceTimer);
+    maintenanceTimer = null;
+  }
+
+  if (maintenanceInitialTimer) {
+    clearTimeout(maintenanceInitialTimer);
+    maintenanceInitialTimer = null;
   }
 
   if (httpServer) {
@@ -1343,6 +1594,26 @@ async function start() {
 
   expirationTimer = setInterval(markExpiredUsers, 60_000);
   expirationTimer.unref();
+
+  maintenanceInitialTimer = setTimeout(() => {
+    runMaintenanceCycle({
+      source: "startup",
+      allowRepair: true
+    }).catch(error => {
+      logger.error("Startup lifecycle maintenance failed", { error });
+    });
+  }, 15_000);
+  maintenanceInitialTimer.unref();
+
+  maintenanceTimer = setInterval(() => {
+    runMaintenanceCycle({
+      source: "scheduled",
+      allowRepair: true
+    }).catch(error => {
+      logger.error("Scheduled lifecycle maintenance failed", { error });
+    });
+  }, MAINTENANCE_INTERVAL_MS);
+  maintenanceTimer.unref();
 
   httpServer = app.listen(port, () => {
     logger.info("TechCPR server started", {
