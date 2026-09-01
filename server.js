@@ -752,6 +752,188 @@ app.delete("/api/admin/users/:id", requireAdmin, async (req, res) => {
   }
 });
 
+
+app.get("/api/admin/reports", requireAdmin, async (req, res) => {
+  try {
+    await markExpiredUsers();
+
+    const now = new Date();
+    const startToday = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate()
+    );
+    const start7 = new Date(startToday.getTime() - 6 * 24 * 60 * 60 * 1000);
+    const start30 = new Date(startToday.getTime() - 29 * 24 * 60 * 60 * 1000);
+
+    const paidRows = await db.all(
+      `SELECT email, plan, created, payment_status, wifi_status
+       FROM wifi_users
+       WHERE payment_status = 'Paid'
+         AND created >= ?
+       ORDER BY created ASC`,
+      [start30.toISOString()]
+    );
+
+    const accountRows = await db.all(
+      `SELECT wifi_status, COUNT(*) AS count
+       FROM wifi_users
+       GROUP BY wifi_status`
+    );
+
+    const priceByPlan = new Map([
+      [plans.day.displayName, plans.day.amount],
+      [plans.week.displayName, plans.week.amount],
+      [plans.month.displayName, plans.month.amount],
+      ["24 Hours", plans.day.amount]
+    ]);
+
+    function rowAmount(row) {
+      return priceByPlan.get(row.plan) || 0;
+    }
+
+    function summarizeSince(startDate) {
+      const rows = paidRows.filter(row => Date.parse(row.created) >= startDate.getTime());
+      return {
+        sales: rows.length,
+        revenueCents: rows.reduce((sum, row) => sum + rowAmount(row), 0)
+      };
+    }
+
+    const today = summarizeSince(startToday);
+    const last7Days = summarizeSince(start7);
+    const last30Days = summarizeSince(start30);
+
+    const planMap = new Map();
+    for (const row of paidRows) {
+      const key = row.plan || "Unknown";
+      const current = planMap.get(key) || {
+        plan: key,
+        sales: 0,
+        revenueCents: 0
+      };
+      current.sales += 1;
+      current.revenueCents += rowAmount(row);
+      planMap.set(key, current);
+    }
+
+    const trend = [];
+    for (let offset = 29; offset >= 0; offset -= 1) {
+      const date = new Date(startToday);
+      date.setDate(startToday.getDate() - offset);
+
+      const nextDate = new Date(date);
+      nextDate.setDate(date.getDate() + 1);
+
+      const rows = paidRows.filter(row => {
+        const created = Date.parse(row.created);
+        return created >= date.getTime() && created < nextDate.getTime();
+      });
+
+      trend.push({
+        date: date.toISOString().slice(0, 10),
+        sales: rows.length,
+        revenueCents: rows.reduce((sum, row) => sum + rowAmount(row), 0)
+      });
+    }
+
+    const accounts = {};
+    for (const row of accountRows) {
+      accounts[row.wifi_status || "Unknown"] = Number(row.count || 0);
+    }
+
+    return res.json({
+      periods: {
+        today,
+        last7Days,
+        last30Days
+      },
+      plans: [...planMap.values()].sort(
+        (a, b) => b.revenueCents - a.revenueCents
+      ),
+      accounts,
+      trend,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error("Reporting lookup failed:", error);
+    return res.status(500).json({ error: "Unable to load reports." });
+  }
+});
+
+app.get("/api/admin/reports.csv", requireAdmin, async (req, res) => {
+  try {
+    const rows = await db.all(
+      `SELECT
+         email,
+         plan,
+         username,
+         created,
+         expires,
+         payment_status,
+         wifi_status,
+         mikrotik_status
+       FROM wifi_users
+       ORDER BY created DESC`
+    );
+
+    const priceByPlan = new Map([
+      [plans.day.displayName, plans.day.amount],
+      [plans.week.displayName, plans.week.amount],
+      [plans.month.displayName, plans.month.amount],
+      ["24 Hours", plans.day.amount]
+    ]);
+
+    function csvValue(value) {
+      const text = String(value ?? "");
+      return `"${text.replace(/"/g, '""')}"`;
+    }
+
+    const header = [
+      "Email",
+      "Plan",
+      "Username",
+      "Created",
+      "Expires",
+      "Payment Status",
+      "WiFi Status",
+      "MikroTik Status",
+      "Revenue USD"
+    ];
+
+    const lines = [header.map(csvValue).join(",")];
+
+    for (const row of rows) {
+      const revenue =
+        row.payment_status === "Paid"
+          ? ((priceByPlan.get(row.plan) || 0) / 100).toFixed(2)
+          : "0.00";
+
+      lines.push([
+        row.email,
+        row.plan,
+        row.username,
+        row.created,
+        row.expires,
+        row.payment_status,
+        row.wifi_status,
+        row.mikrotik_status,
+        revenue
+      ].map(csvValue).join(","));
+    }
+
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="techcpr-wifi-report.csv"'
+    );
+    res.type("text/csv");
+    return res.send(lines.join("\r\n"));
+  } catch (error) {
+    console.error("CSV export failed:", error);
+    return res.status(500).json({ error: "Unable to export report." });
+  }
+});
+
 app.get("/api/admin/users", requireAdmin, async (req, res) => {
   try {
     await markExpiredUsers();

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TechCPR Reporting & Analytics</title>
+  <link rel="stylesheet" href="/css/main.css?v=5.3">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="app-header__inner">
+        <img class="app-logo" src="/images/logo.png"
+             alt="TechCPR Computer Repairs and IT Services">
+      </div>
+    </header>
+
+    <main class="app-main">
+      <section id="reports-login">
+        <div class="page-heading">
+          <div class="icon-badge" aria-hidden="true">▥</div>
+          <h1>Reporting & Analytics</h1>
+          <p>Secure sales, revenue, and account reporting.</p>
+        </div>
+
+        <section class="panel dashboard-login-card">
+          <label for="reports-password">Administrator Password</label>
+          <div class="field">
+            <span class="field__icon" aria-hidden="true">🔒</span>
+            <input class="input" id="reports-password" type="password"
+                   autocomplete="current-password"
+                   placeholder="Enter admin password">
+          </div>
+          <button class="button" id="reports-login-button" type="button">
+            Sign In
+          </button>
+          <p id="reports-login-message" class="status-message"></p>
+        </section>
+      </section>
+
+      <section id="reports-content" class="reports-dashboard" hidden>
+        <div class="operations-topbar">
+          <div>
+            <h1>Reporting & Analytics</h1>
+            <p id="reports-updated">Loading report…</p>
+          </div>
+          <div class="operations-actions">
+            <a class="button button--secondary action-link" href="/dashboard.html">
+              Dashboard
+            </a>
+            <a class="button button--secondary action-link" href="/admin.html">
+              Customers
+            </a>
+            <button id="export-csv" class="button button--secondary" type="button">
+              Export CSV
+            </button>
+            <button id="reports-refresh" class="button button--secondary" type="button">
+              Refresh
+            </button>
+            <button id="reports-signout" class="button button--danger" type="button">
+              Sign Out
+            </button>
+          </div>
+        </div>
+
+        <section class="metric-grid reports-metrics">
+          <article class="panel metric-card">
+            <div class="metric-card__icon">$</div>
+            <div>
+              <div class="metric-card__label">Revenue Today</div>
+              <div id="report-revenue-today" class="metric-card__value">$0.00</div>
+            </div>
+          </article>
+          <article class="panel metric-card">
+            <div class="metric-card__icon">7</div>
+            <div>
+              <div class="metric-card__label">Revenue / 7 Days</div>
+              <div id="report-revenue-7" class="metric-card__value">$0.00</div>
+            </div>
+          </article>
+          <article class="panel metric-card">
+            <div class="metric-card__icon">30</div>
+            <div>
+              <div class="metric-card__label">Revenue / 30 Days</div>
+              <div id="report-revenue-30" class="metric-card__value">$0.00</div>
+            </div>
+          </article>
+          <article class="panel metric-card">
+            <div class="metric-card__icon">#</div>
+            <div>
+              <div class="metric-card__label">Sales / 30 Days</div>
+              <div id="report-sales-30" class="metric-card__value">0</div>
+            </div>
+          </article>
+        </section>
+
+        <section class="reports-grid">
+          <article class="panel reports-panel reports-trend-panel">
+            <div class="operations-panel__header">
+              <div>
+                <h2>30-Day Revenue Trend</h2>
+                <p>Daily paid WiFi revenue.</p>
+              </div>
+            </div>
+            <div id="revenue-trend" class="revenue-trend"></div>
+          </article>
+
+          <article class="panel reports-panel">
+            <div class="operations-panel__header">
+              <div>
+                <h2>Sales by Plan</h2>
+                <p>Paid transactions during the last 30 days.</p>
+              </div>
+            </div>
+            <div id="plan-report" class="plan-report"></div>
+          </article>
+
+          <article class="panel reports-panel">
+            <div class="operations-panel__header">
+              <div>
+                <h2>Account Status</h2>
+                <p>Current customer lifecycle totals.</p>
+              </div>
+            </div>
+            <div id="account-report" class="account-report"></div>
+          </article>
+        </section>
+
+        <p id="reports-message" class="status-message"></p>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      Need help? Contact
+      <a href="mailto:TechCPRSupport@gmail.com">TechCPRSupport@gmail.com</a>
+    </footer>
+  </div>
+
+  <script src="/js/common.js" defer></script>
+  <script src="/js/reports.js" defer></script>
+</body>
+</html>
