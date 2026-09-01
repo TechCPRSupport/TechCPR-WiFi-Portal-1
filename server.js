@@ -22,7 +22,62 @@ for (const name of REQUIRED_ENV) {
   }
 }
 
+const isProduction =
+  String(process.env.NODE_ENV || "development").toLowerCase() === "production";
+
+if (isProduction) {
+  if (!String(process.env.BASE_URL || "").startsWith("https://")) {
+    console.error("Production requires BASE_URL to use HTTPS.");
+    process.exit(1);
+  }
+
+  if (!String(process.env.STRIPE_SECRET_KEY || "").startsWith("sk_live_")) {
+    console.error("Production requires a Stripe live-mode secret key.");
+    process.exit(1);
+  }
+
+  if (String(process.env.ADMIN_PASSWORD || "").length < 16) {
+    console.error("Production requires ADMIN_PASSWORD to be at least 16 characters.");
+    process.exit(1);
+  }
+}
+
 const app = express();
+
+app.disable("x-powered-by");
+
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader(
+    "Permissions-Policy",
+    "camera=(), microphone=(), geolocation=(), payment=()"
+  );
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+  res.setHeader(
+    "Content-Security-Policy",
+    "default-src 'self'; " +
+      "script-src 'self'; " +
+      "style-src 'self' 'unsafe-inline'; " +
+      "img-src 'self' data:; " +
+      "connect-src 'self'; " +
+      "object-src 'none'; " +
+      "base-uri 'self'; " +
+      "frame-ancestors 'none'"
+  );
+
+  if (
+    req.path.startsWith("/api/admin/") ||
+    req.path.startsWith("/api/purchase/")
+  ) {
+    res.setHeader("Cache-Control", "no-store, max-age=0");
+    res.setHeader("Pragma", "no-cache");
+  }
+
+  next();
+});
+
 app.use(logger.requestMiddleware);
 
 const port = Number(process.env.PORT || 3000);
@@ -61,6 +116,72 @@ function isValidEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+
+function safeSecretEqual(left, right) {
+  const leftBuffer = Buffer.from(String(left || ""), "utf8");
+  const rightBuffer = Buffer.from(String(right || ""), "utf8");
+
+  if (leftBuffer.length !== rightBuffer.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function createRateLimiter({ windowMs, maxAttempts, message }) {
+  const attempts = new Map();
+
+  return function rateLimiter(req, res, next) {
+    const now = Date.now();
+    const key = req.ip || req.socket?.remoteAddress || "unknown";
+    const current = attempts.get(key);
+
+    if (!current || current.resetAt <= now) {
+      attempts.set(key, {
+        count: 1,
+        resetAt: now + windowMs
+      });
+      return next();
+    }
+
+    if (current.count >= maxAttempts) {
+      const retryAfterSeconds = Math.max(
+        1,
+        Math.ceil((current.resetAt - now) / 1000)
+      );
+
+      res.setHeader("Retry-After", String(retryAfterSeconds));
+
+      logger.warn("Request rate limit reached", {
+        path: req.path,
+        ip: key,
+        retryAfterSeconds
+      });
+
+      return res.status(429).json({
+        error: message,
+        retryAfterSeconds
+      });
+    }
+
+    current.count += 1;
+    attempts.set(key, current);
+    return next();
+  };
+}
+
+const adminLoginLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  maxAttempts: 8,
+  message: "Too many administrator login attempts. Please try again later."
+});
+
+const checkoutLimiter = createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  maxAttempts: 20,
+  message: "Too many checkout requests. Please try again shortly."
+});
+
 const ADMIN_SESSION_TTL_MS = Number(
   process.env.ADMIN_SESSION_TTL_MS || 8 * 60 * 60 * 1000
 );
@@ -97,13 +218,7 @@ function requireAdmin(req, res, next) {
     req.adminSessionToken = token;
     return next();
   }
-
-  const suppliedPassword = req.get("x-admin-password");
-  if (suppliedPassword === process.env.ADMIN_PASSWORD) {
-    return next();
-  }
-
-  return res.status(401).json({ error: "Unauthorized." });
+return res.status(401).json({ error: "Unauthorized." });
 }
 
 async function markExpiredUsers() {
@@ -501,7 +616,7 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "plans.html"));
 });
 
-app.post("/checkout", async (req, res) => {
+app.post("/checkout", checkoutLimiter, async (req, res) => {
   try {
     const planKey = String(req.body?.plan || "");
     const email = normalizeEmail(req.body?.email);
@@ -598,8 +713,12 @@ app.get("/api/status", async (req, res) => {
   return res.status(status.database === "ok" ? 200 : 503).json(status);
 });
 
-app.post("/api/admin/login", (req, res) => {
-  if (req.body?.password !== process.env.ADMIN_PASSWORD) {
+app.post("/api/admin/login", adminLoginLimiter, (req, res) => {
+  if (!safeSecretEqual(req.body?.password, process.env.ADMIN_PASSWORD)) {
+    logger.warn("Administrator login rejected", {
+      ip: req.ip
+    });
+
     return res.status(401).json({
       success: false,
       error: "Invalid admin password."
@@ -607,6 +726,11 @@ app.post("/api/admin/login", (req, res) => {
   }
 
   const session = createAdminSession();
+
+  logger.info("Administrator login accepted", {
+    ip: req.ip,
+    expiresAt: session.expiresAt
+  });
 
   return res.json({
     success: true,
