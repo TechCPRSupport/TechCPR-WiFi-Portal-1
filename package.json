@@ -5,8 +5,11 @@
   "description": "Stripe-powered WiFi captive portal with MikroTik HotSpot provisioning.",
   "main": "server.js",
   "scripts": {
+    "prestart": "node scripts/patch-node-routeros.js && node scripts/preflight.js",
     "start": "node server.js",
     "dev": "node --watch server.js",
+    "preflight": "node scripts/preflight.js",
+    "backup": "node scripts/backup-db.js",
     "test:mikrotik": "node test-mikrotik.js",
     "test:provision": "node test-provision.js",
     "postinstall": "node scripts/patch-node-routeros.js"
