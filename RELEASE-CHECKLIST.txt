@@ -1,0 +1,100 @@
+TechCPR WiFi Portal RC6.6 - Release Candidate Validation
+
+AUTOMATED CHECK
+---------------
+Run:
+  npm run release:check
+
+The automated test validates:
+- required project files
+- required environment variables
+- SQLite database presence
+- recent database backup (24 hours or newer)
+- clean Git working tree
+- production preflight
+- security check
+- MikroTik / SQLite synchronization
+
+MANUAL RELEASE TEST
+-------------------
+Keep Stripe CLI running:
+  stripe listen --forward-to localhost:3000/webhook
+
+Then start:
+  npm start
+
+Test in this order:
+
+[ ] 1. Startup
+    - RouterOS compatibility says correct.
+    - Preflight passes.
+    - Server starts normally.
+
+[ ] 2. Customer purchase
+    - Open http://localhost:3000/plans.html
+    - Enter a test email.
+    - Choose ONE plan.
+    - Stripe TEST checkout opens.
+    - Complete payment with Stripe test card 4242 4242 4242 4242.
+
+[ ] 3. Payment / provisioning
+    - Stripe CLI shows checkout.session.completed -> HTTP 200.
+    - Success page shows username.
+    - Success page shows password.
+    - WiFi Status shows Active.
+    - Expiration is correct for selected plan.
+
+[ ] 4. MikroTik
+    - New customer exists in HotSpot users.
+    - Credentials can authenticate through captive portal.
+
+[ ] 5. Admin
+    - Dashboard login works.
+    - Customers opens without signing in again.
+    - Reports opens without signing in again.
+    - Recovery opens without signing in again.
+    - System Status is healthy.
+
+[ ] 6. Customer lifecycle
+    - Extend Access works.
+    - Recovery still reports 0 differences after extension.
+    - Do not delete the release-test customer until testing is complete.
+
+[ ] 7. Reporting
+    - Test purchase appears in reporting.
+    - CSV export downloads successfully.
+
+[ ] 8. Duplicate webhook protection
+    - Replay the completed checkout event:
+      node scripts/test-webhook-replay.js evt_...
+    - Result must say PASS.
+    - Row count remains 1.
+    - Username remains unchanged.
+    - Expiration remains unchanged.
+
+[ ] 9. Backup
+    - Run npm run backup.
+    - Confirm new backup exists under backups\.
+
+[ ] 10. Shutdown / restart
+    - Press Ctrl+C once.
+    - Shutdown started is logged.
+    - SQLite connection closed is logged.
+    - Shutdown complete is logged.
+    - Run npm start again.
+    - Dashboard and Recovery return healthy.
+
+[ ] 11. Git
+    - git status
+    - Working tree clean.
+
+WHEN ALL ITEMS PASS
+-------------------
+Commit RC6.6:
+  git add package.json scripts/release-check.js RELEASE-CHECKLIST.txt
+  git commit -m "RC6.6 - Add release candidate validation"
+  git push origin develop
+
+Do NOT switch Stripe to live mode yet.
+Do NOT set NODE_ENV=production yet.
+Do NOT create the v1.0.0 tag until the final production cutover checklist is complete.
