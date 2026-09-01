@@ -508,3 +508,95 @@
   }
 }
 
+/* RC6.2 Recovery & Reconciliation */
+.recovery-dashboard{
+  width:min(1100px,96vw);
+  margin:0 auto;
+}
+
+.recovery-metrics{
+  margin-bottom:10px;
+}
+
+.recovery-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+
+.recovery-panel{
+  min-height:220px;
+  padding:14px;
+}
+
+.recovery-panel--wide{
+  grid-column:1 / -1;
+  min-height:160px;
+}
+
+.recovery-list{
+  display:grid;
+  gap:7px;
+}
+
+.recovery-row{
+  min-height:52px;
+  padding:8px 10px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:10px;
+  background:rgba(0,0,0,.12);
+}
+
+.recovery-row__text{
+  min-width:0;
+  display:grid;
+  gap:2px;
+}
+
+.recovery-row__text strong{
+  font-size:.82rem;
+}
+
+.recovery-row__text span{
+  color:var(--color-muted);
+  font-size:.72rem;
+  overflow-wrap:anywhere;
+}
+
+.recovery-action{
+  width:auto!important;
+  min-width:118px!important;
+  padding:0 10px!important;
+  flex:0 0 auto;
+}
+
+.recovery-empty{
+  padding:22px 12px;
+  color:var(--color-muted);
+  text-align:center;
+  font-size:.8rem;
+}
+
+@media(max-width:880px){
+  .recovery-grid{
+    grid-template-columns:1fr;
+  }
+
+  .recovery-panel--wide{
+    grid-column:auto;
+  }
+
+  .recovery-row{
+    align-items:flex-start;
+    flex-direction:column;
+  }
+
+  .recovery-action{
+    width:100%!important;
+  }
+}
+

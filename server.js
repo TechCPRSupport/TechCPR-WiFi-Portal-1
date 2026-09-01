@@ -409,74 +409,86 @@ app.post("/api/admin/logout", requireAdmin, (req, res) => {
 
 
 
+async function buildSyncStatus() {
+  const [databaseUsers, routerUsers] = await Promise.all([
+    db.all(
+      `SELECT id, email, plan, username, password, wifi_status,
+              mikrotik_status, expires
+       FROM wifi_users
+       WHERE wifi_status IN ('Active', 'Suspended', 'Provisioning Error')
+       ORDER BY username`
+    ),
+    mikrotik.listWifiUsers()
+  ]);
+
+  const routerByName = new Map(
+    routerUsers.filter(user => user.name).map(user => [user.name, user])
+  );
+  const databaseByName = new Map(
+    databaseUsers.map(user => [user.username, user])
+  );
+
+  const missingOnRouter = databaseUsers
+    .filter(user => !routerByName.has(user.username))
+    .map(user => ({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      plan: user.plan,
+      wifiStatus: user.wifi_status,
+      mikrotikStatus: user.mikrotik_status
+    }));
+
+  const stateMismatches = databaseUsers
+    .filter(user => {
+      const routerUser = routerByName.get(user.username);
+      if (!routerUser) return false;
+
+      const shouldBeDisabled = user.wifi_status === "Suspended";
+      return routerUser.disabled !== shouldBeDisabled;
+    })
+    .map(user => {
+      const routerUser = routerByName.get(user.username);
+
+      return {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        wifiStatus: user.wifi_status,
+        routerDisabled: routerUser.disabled
+      };
+    });
+
+  const orphanedRouterUsers = routerUsers
+    .filter(user =>
+      user.name &&
+      /^CPR/i.test(user.name) &&
+      !databaseByName.has(user.name)
+    )
+    .map(user => ({
+      username: user.name,
+      disabled: user.disabled,
+      profile: user.profile,
+      comment: user.comment
+    }));
+
+  return {
+    healthy:
+      missingOnRouter.length === 0 &&
+      stateMismatches.length === 0 &&
+      orphanedRouterUsers.length === 0,
+    databaseUsersChecked: databaseUsers.length,
+    routerUsersChecked: routerUsers.length,
+    missingOnRouter,
+    stateMismatches,
+    orphanedRouterUsers,
+    timestamp: new Date().toISOString()
+  };
+}
+
 app.get("/api/admin/sync-status", requireAdmin, async (req, res) => {
   try {
-    const [databaseUsers, routerUsers] = await Promise.all([
-      db.all(
-        `SELECT id, username, wifi_status, mikrotik_status, expires
-         FROM wifi_users
-         WHERE wifi_status IN ('Active', 'Suspended', 'Provisioning Error')
-         ORDER BY username`
-      ),
-      mikrotik.listWifiUsers()
-    ]);
-
-    const routerByName = new Map(
-      routerUsers.filter(user => user.name).map(user => [user.name, user])
-    );
-    const databaseByName = new Map(
-      databaseUsers.map(user => [user.username, user])
-    );
-
-    const missingOnRouter = databaseUsers
-      .filter(user => !routerByName.has(user.username))
-      .map(user => ({
-        username: user.username,
-        wifiStatus: user.wifi_status,
-        mikrotikStatus: user.mikrotik_status
-      }));
-
-    const stateMismatches = databaseUsers
-      .filter(user => {
-        const routerUser = routerByName.get(user.username);
-        if (!routerUser) return false;
-
-        const shouldBeDisabled = user.wifi_status === "Suspended";
-        return routerUser.disabled !== shouldBeDisabled;
-      })
-      .map(user => {
-        const routerUser = routerByName.get(user.username);
-        return {
-          username: user.username,
-          wifiStatus: user.wifi_status,
-          routerDisabled: routerUser.disabled
-        };
-      });
-
-    const orphanedRouterUsers = routerUsers
-      .filter(user =>
-        user.name &&
-        /^CPR/i.test(user.name) &&
-        !databaseByName.has(user.name)
-      )
-      .map(user => ({
-        username: user.name,
-        disabled: user.disabled,
-        profile: user.profile
-      }));
-
-    return res.json({
-      healthy:
-        missingOnRouter.length === 0 &&
-        stateMismatches.length === 0 &&
-        orphanedRouterUsers.length === 0,
-      databaseUsersChecked: databaseUsers.length,
-      routerUsersChecked: routerUsers.length,
-      missingOnRouter,
-      stateMismatches,
-      orphanedRouterUsers,
-      timestamp: new Date().toISOString()
-    });
+    return res.json(await buildSyncStatus());
   } catch (error) {
     logger.error("Router/database sync check failed", { error });
     return res.status(500).json({
@@ -484,6 +496,185 @@ app.get("/api/admin/sync-status", requireAdmin, async (req, res) => {
     });
   }
 });
+
+app.post("/api/admin/recovery/users/:id/repair", requireAdmin, async (req, res) => {
+  const userId = Number(req.params.id);
+  const confirmation = String(req.body?.confirmation || "");
+
+  if (!Number.isInteger(userId) || userId <= 0) {
+    return res.status(400).json({ error: "Invalid customer ID." });
+  }
+
+  if (confirmation !== "REPAIR") {
+    return res.status(400).json({
+      error: 'Recovery requires confirmation value "REPAIR".'
+    });
+  }
+
+  try {
+    const user = await db.get(
+      `SELECT id, email, plan, username, password, wifi_status,
+              mikrotik_status, expires
+       FROM wifi_users
+       WHERE id = ?`,
+      [userId]
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: "Customer not found." });
+    }
+
+    if (!["Active", "Suspended", "Provisioning Error"].includes(user.wifi_status)) {
+      return res.status(400).json({
+        error: `Customer status ${user.wifi_status} is not eligible for recovery.`
+      });
+    }
+
+    if (Date.parse(user.expires) <= Date.now()) {
+      return res.status(400).json({
+        error: "Expired accounts must be extended before router recovery."
+      });
+    }
+
+    const routerUsers = await mikrotik.listWifiUsers();
+    const routerUser = routerUsers.find(item => item.name === user.username);
+    const planEntry = Object.values(plans).find(
+      plan => plan.displayName === user.plan
+    );
+    const profile =
+      planEntry?.profile ||
+      process.env.MIKROTIK_CUSTOMER_PROFILE ||
+      "customer";
+
+    let action = "";
+
+    if (!routerUser) {
+      await mikrotik.createWifiUser({
+        username: user.username,
+        password: user.password,
+        profile,
+        comment: `Recovered by TechCPR - ${user.email}`
+      });
+
+      action = "recreated";
+
+      if (user.wifi_status === "Suspended") {
+        await mikrotik.disableWifiUser(user.username);
+        action = "recreated-disabled";
+      }
+    } else if (user.wifi_status === "Suspended" && !routerUser.disabled) {
+      await mikrotik.disableWifiUser(user.username);
+      action = "disabled";
+    } else if (
+      ["Active", "Provisioning Error"].includes(user.wifi_status) &&
+      routerUser.disabled
+    ) {
+      await mikrotik.enableWifiUser(user.username);
+      action = "enabled";
+    } else {
+      action = "already-correct";
+    }
+
+    const finalWifiStatus =
+      user.wifi_status === "Suspended" ? "Suspended" : "Active";
+    const finalMikrotikStatus =
+      finalWifiStatus === "Suspended" ? "Disabled" : "Created";
+
+    await db.run(
+      `UPDATE wifi_users
+       SET wifi_status = ?,
+           mikrotik_status = ?
+       WHERE id = ?`,
+      [finalWifiStatus, finalMikrotikStatus, userId]
+    );
+
+    logger.info("Router recovery completed", {
+      userId,
+      username: user.username,
+      action
+    });
+
+    return res.json({
+      success: true,
+      action,
+      username: user.username,
+      wifiStatus: finalWifiStatus,
+      mikrotikStatus: finalMikrotikStatus,
+      sync: await buildSyncStatus()
+    });
+  } catch (error) {
+    logger.error("Router recovery failed", {
+      userId,
+      error
+    });
+
+    return res.status(500).json({
+      error: error.message || "Unable to repair customer router state."
+    });
+  }
+});
+
+app.post(
+  "/api/admin/recovery/orphans/:username/disable",
+  requireAdmin,
+  async (req, res) => {
+    const username = String(req.params.username || "").trim();
+    const confirmation = String(req.body?.confirmation || "");
+
+    if (!/^CPR[A-Z0-9]+$/i.test(username)) {
+      return res.status(400).json({
+        error: "Only TechCPR-managed HotSpot usernames may be quarantined."
+      });
+    }
+
+    if (confirmation !== "DISABLE") {
+      return res.status(400).json({
+        error: 'Quarantine requires confirmation value "DISABLE".'
+      });
+    }
+
+    try {
+      const databaseUser = await db.get(
+        "SELECT id FROM wifi_users WHERE username = ?",
+        [username]
+      );
+
+      if (databaseUser) {
+        return res.status(409).json({
+          error: "This username exists in the database and is not an orphan."
+        });
+      }
+
+      const result = await mikrotik.disableWifiUser(username);
+
+      if (result.missing) {
+        return res.status(404).json({
+          error: "The orphaned router user no longer exists."
+        });
+      }
+
+      logger.warn("Orphaned MikroTik user quarantined", {
+        username
+      });
+
+      return res.json({
+        success: true,
+        action: "disabled",
+        username,
+        sync: await buildSyncStatus()
+      });
+    } catch (error) {
+      logger.error("Orphan quarantine failed", {
+        username,
+        error
+      });
+
+      return res.status(500).json({
+        error: error.message || "Unable to quarantine orphaned router user."
+      });
+    }
+  }
+);
 
 app.get("/api/admin/dashboard", requireAdmin, async (req, res) => {
   try {

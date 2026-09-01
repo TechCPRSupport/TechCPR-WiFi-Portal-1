@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TechCPR Recovery & Reconciliation</title>
+  <link rel="stylesheet" href="/css/main.css?v=6.2">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="app-header__inner">
+        <img class="app-logo" src="/images/logo.png"
+             alt="TechCPR Computer Repairs and IT Services">
+      </div>
+    </header>
+
+    <main class="app-main">
+      <section id="recovery-login">
+        <div class="page-heading">
+          <div class="icon-badge" aria-hidden="true">↻</div>
+          <h1>Recovery & Reconciliation</h1>
+          <p>Compare SQLite customer state with the MikroTik HotSpot database.</p>
+        </div>
+
+        <section class="panel dashboard-login-card">
+          <label for="recovery-password">Administrator Password</label>
+          <div class="field">
+            <span class="field__icon" aria-hidden="true">🔒</span>
+            <input class="input" id="recovery-password" type="password"
+                   autocomplete="current-password"
+                   placeholder="Enter admin password">
+          </div>
+          <button class="button" id="recovery-login-button" type="button">
+            Sign In
+          </button>
+          <p id="recovery-login-message" class="status-message"></p>
+        </section>
+      </section>
+
+      <section id="recovery-content" class="recovery-dashboard" hidden>
+        <div class="operations-topbar">
+          <div>
+            <h1>Recovery & Reconciliation</h1>
+            <p id="recovery-updated">Checking system state…</p>
+          </div>
+
+          <div class="operations-actions">
+            <a class="button button--secondary action-link" href="/dashboard.html">
+              Dashboard
+            </a>
+            <a class="button button--secondary action-link" href="/admin.html">
+              Customers
+            </a>
+            <a class="button button--secondary action-link" href="/reports.html">
+              Reports
+            </a>
+            <a class="button button--secondary action-link admin-nav-active"
+               href="/recovery.html">
+              Recovery
+            </a>
+            <button id="recovery-refresh" class="button button--secondary"
+                    type="button">Scan Again</button>
+            <button id="recovery-signout" class="button button--danger"
+                    type="button">Sign Out</button>
+          </div>
+        </div>
+
+        <section class="metric-grid recovery-metrics">
+          <article class="panel metric-card">
+            <div class="metric-card__icon">✓</div>
+            <div>
+              <div class="metric-card__label">Sync Health</div>
+              <div id="sync-health" class="metric-card__value">Checking</div>
+            </div>
+          </article>
+
+          <article class="panel metric-card">
+            <div class="metric-card__icon">DB</div>
+            <div>
+              <div class="metric-card__label">Managed DB Users</div>
+              <div id="sync-db-count" class="metric-card__value">0</div>
+            </div>
+          </article>
+
+          <article class="panel metric-card">
+            <div class="metric-card__icon">R</div>
+            <div>
+              <div class="metric-card__label">Router Users</div>
+              <div id="sync-router-count" class="metric-card__value">0</div>
+            </div>
+          </article>
+
+          <article class="panel metric-card">
+            <div class="metric-card__icon">!</div>
+            <div>
+              <div class="metric-card__label">Differences</div>
+              <div id="sync-difference-count" class="metric-card__value">0</div>
+            </div>
+          </article>
+        </section>
+
+        <section class="recovery-grid">
+          <article class="panel recovery-panel">
+            <div class="operations-panel__header">
+              <div>
+                <h2>Missing Router Users</h2>
+                <p>Active/suspended database users not present on MikroTik.</p>
+              </div>
+            </div>
+            <div id="missing-users" class="recovery-list"></div>
+          </article>
+
+          <article class="panel recovery-panel">
+            <div class="operations-panel__header">
+              <div>
+                <h2>State Mismatches</h2>
+                <p>Enabled/disabled state differs between the database and router.</p>
+              </div>
+            </div>
+            <div id="state-mismatches" class="recovery-list"></div>
+          </article>
+
+          <article class="panel recovery-panel recovery-panel--wide">
+            <div class="operations-panel__header">
+              <div>
+                <h2>Orphaned Router Users</h2>
+                <p>
+                  TechCPR-style users found on the router without a SQLite record.
+                  Recovery only disables these users; it never deletes them automatically.
+                </p>
+              </div>
+            </div>
+            <div id="orphan-users" class="recovery-list"></div>
+          </article>
+        </section>
+
+        <p id="recovery-message" class="status-message"></p>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      Need help? Contact
+      <a href="mailto:TechCPRSupport@gmail.com">TechCPRSupport@gmail.com</a>
+    </footer>
+  </div>
+
+  <script src="/js/common.js" defer></script>
+  <script src="/js/admin-auth.js" defer></script>
+  <script src="/js/recovery.js" defer></script>
+</body>
+</html>
