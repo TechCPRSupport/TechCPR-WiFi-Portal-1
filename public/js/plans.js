@@ -1,28 +1,24 @@
 (() => {
   "use strict";
 
-  const form = document.getElementById("checkout-form");
   const emailInput = document.getElementById("email");
   const message = document.getElementById("message");
   const buttons = [...document.querySelectorAll("[data-plan]")];
 
-  let selectedPlan = "";
-
-  for (const button of buttons) {
-    button.addEventListener("click", () => {
-      selectedPlan = button.dataset.plan || "";
-    });
+  function isValidEmail(value) {
+    const email = String(value || "").trim();
+    return (
+      email.length >= 3 &&
+      email.length <= 254 &&
+      !/\s/.test(email) &&
+      /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)
+    );
   }
 
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
+  async function startCheckout(plan) {
+    const email = emailInput.value.trim();
 
-    if (!selectedPlan) {
-      TechCPR.setMessage(message, "Please choose a plan.", "error");
-      return;
-    }
-
-    if (!emailInput.checkValidity()) {
+    if (!isValidEmail(email)) {
       TechCPR.setMessage(message, "Please enter a valid email address.", "error");
       emailInput.focus();
       return;
@@ -35,13 +31,15 @@
       const response = await fetch("/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          plan: selectedPlan,
-          email: emailInput.value.trim()
-        })
+        body: JSON.stringify({ plan, email })
       });
 
-      const data = await response.json();
+      let data = {};
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error(`Checkout server returned HTTP ${response.status}.`);
+      }
 
       if (!response.ok || !data.url) {
         throw new Error(data.error || "Unable to start checkout.");
@@ -49,6 +47,7 @@
 
       window.location.assign(data.url);
     } catch (error) {
+      console.error("Checkout failed:", error);
       TechCPR.setMessage(
         message,
         error.message || "Unable to connect to the payment server.",
@@ -56,5 +55,18 @@
       );
       TechCPR.setBusy(buttons, false);
     }
-  });
+  }
+
+  for (const button of buttons) {
+    button.type = "button";
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      const plan = button.dataset.plan || "";
+      if (!plan) {
+        TechCPR.setMessage(message, "Unable to determine the selected plan.", "error");
+        return;
+      }
+      startCheckout(plan);
+    });
+  }
 })();

@@ -84,9 +84,6 @@ async function initialize() {
     )
   `);
 
-  /*
-   * These migrations preserve databases created by earlier project versions.
-   */
   await addColumnIfMissing(
     "wifi_users",
     "stripe_payment_intent",
@@ -97,6 +94,40 @@ async function initialize() {
     "mikrotik_status",
     "TEXT NOT NULL DEFAULT 'Pending'"
   );
+  await addColumnIfMissing(
+    "wifi_users",
+    "provision_attempts",
+    "INTEGER NOT NULL DEFAULT 0"
+  );
+  await addColumnIfMissing(
+    "wifi_users",
+    "last_provision_attempt",
+    "TEXT"
+  );
+  await addColumnIfMissing(
+    "wifi_users",
+    "last_provision_error",
+    "TEXT"
+  );
+  await addColumnIfMissing(
+    "wifi_users",
+    "provisioned_at",
+    "TEXT"
+  );
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS stripe_webhook_events (
+      event_id TEXT PRIMARY KEY,
+      event_type TEXT NOT NULL,
+      stripe_session TEXT,
+      status TEXT NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      last_error TEXT,
+      first_received TEXT NOT NULL,
+      last_received TEXT NOT NULL,
+      completed_at TEXT
+    )
+  `);
 
   await run(`
     CREATE INDEX IF NOT EXISTS idx_wifi_users_stripe_session
@@ -112,6 +143,31 @@ async function initialize() {
     CREATE INDEX IF NOT EXISTS idx_wifi_users_expires
     ON wifi_users(expires)
   `);
+
+  await run(`
+    CREATE INDEX IF NOT EXISTS idx_stripe_webhook_events_session
+    ON stripe_webhook_events(stripe_session)
+  `);
+
+  const duplicateSessions = await all(`
+    SELECT stripe_session, COUNT(*) AS count
+    FROM wifi_users
+    WHERE stripe_session IS NOT NULL
+      AND stripe_session <> ''
+    GROUP BY stripe_session
+    HAVING COUNT(*) > 1
+  `);
+
+  if (!duplicateSessions.length) {
+    await run(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_wifi_users_stripe_session_unique
+      ON wifi_users(stripe_session)
+    `);
+  } else {
+    console.warn(
+      "Duplicate stripe_session rows detected; unique session protection was not enabled."
+    );
+  }
 
   console.log(`TechCPR database ready: ${databasePath}`);
 }

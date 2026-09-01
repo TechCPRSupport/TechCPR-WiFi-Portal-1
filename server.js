@@ -145,16 +145,6 @@ async function markExpiredUsers() {
 }
 
 async function provisionCompletedCheckout(session) {
-  const existing = await db.get(
-    "SELECT id FROM wifi_users WHERE stripe_session = ?",
-    [session.id]
-  );
-
-  if (existing) {
-    console.log(`Stripe session already provisioned: ${session.id}`);
-    return;
-  }
-
   const planKey = session.metadata?.plan;
   const selectedPlan = plans[planKey];
 
@@ -170,70 +160,262 @@ async function provisionCompletedCheckout(session) {
     throw new Error(`Stripe session has no valid customer email: ${session.id}`);
   }
 
-  const username = `CPR${createCode(5)}`;
-  const password = createCode(8);
-  const created = new Date();
-  const expires = new Date(created.getTime() + selectedPlan.durationMs);
   const paymentIntent =
     typeof session.payment_intent === "string" ? session.payment_intent : null;
 
+  let customer = await db.get(
+    `SELECT *
+     FROM wifi_users
+     WHERE stripe_session = ?`,
+    [session.id]
+  );
+
+  if (!customer) {
+    const username = `CPR${createCode(5)}`;
+    const password = createCode(8);
+    const created = new Date();
+    const expires = new Date(created.getTime() + selectedPlan.durationMs);
+
+    try {
+      await db.run(
+        `INSERT INTO wifi_users (
+          email,
+          plan,
+          username,
+          password,
+          expires,
+          created,
+          stripe_session,
+          stripe_payment_intent,
+          payment_status,
+          wifi_status,
+          mikrotik_status,
+          provision_attempts,
+          last_provision_attempt,
+          last_provision_error,
+          provisioned_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          email,
+          selectedPlan.displayName,
+          username,
+          password,
+          expires.toISOString(),
+          created.toISOString(),
+          session.id,
+          paymentIntent,
+          "Paid",
+          "Pending",
+          "Pending",
+          0,
+          null,
+          null,
+          null
+        ]
+      );
+    } catch (error) {
+      if (!/UNIQUE constraint failed.*stripe_session/i.test(error.message)) {
+        throw error;
+      }
+
+      logger.warn("Concurrent Stripe provisioning insert was deduplicated", {
+        stripeSession: session.id
+      });
+    }
+
+    customer = await db.get(
+      `SELECT *
+       FROM wifi_users
+       WHERE stripe_session = ?`,
+      [session.id]
+    );
+  }
+
+  if (!customer) {
+    throw new Error(
+      `Unable to create or retrieve WiFi record for Stripe session ${session.id}`
+    );
+  }
+
+  if (
+    customer.wifi_status === "Active" &&
+    customer.mikrotik_status === "Created"
+  ) {
+    logger.info("Stripe session already fully provisioned", {
+      stripeSession: session.id,
+      userId: customer.id,
+      username: customer.username
+    });
+
+    return customer;
+  }
+
+  const attemptTime = new Date().toISOString();
+
   await db.run(
-    `INSERT INTO wifi_users (
-      email,
-      plan,
-      username,
-      password,
-      expires,
-      created,
-      stripe_session,
-      stripe_payment_intent,
-      payment_status,
-      wifi_status,
-      mikrotik_status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      email,
-      selectedPlan.displayName,
-      username,
-      password,
-      expires.toISOString(),
-      created.toISOString(),
-      session.id,
-      paymentIntent,
-      "Paid",
-      "Pending",
-      "Pending"
-    ]
+    `UPDATE wifi_users
+     SET payment_status = 'Paid',
+         stripe_payment_intent = COALESCE(?, stripe_payment_intent),
+         provision_attempts = COALESCE(provision_attempts, 0) + 1,
+         last_provision_attempt = ?,
+         last_provision_error = NULL
+     WHERE id = ?`,
+    [paymentIntent, attemptTime, customer.id]
   );
 
   try {
-    await mikrotik.createWifiUser({
-      username,
-      password,
-      profile: selectedPlan.profile,
-      comment: `TechCPR ${selectedPlan.displayName} - ${email}`
-    });
+    const routerUsers = await mikrotik.listWifiUsers();
+    const routerUser = routerUsers.find(
+      user => user.name === customer.username
+    );
+
+    if (!routerUser) {
+      await mikrotik.createWifiUser({
+        username: customer.username,
+        password: customer.password,
+        profile: selectedPlan.profile,
+        comment: `TechCPR ${selectedPlan.displayName} - ${email}`
+      });
+    } else if (routerUser.disabled) {
+      await mikrotik.enableWifiUser(customer.username);
+    }
+
+    const provisionedAt = new Date().toISOString();
 
     await db.run(
       `UPDATE wifi_users
        SET wifi_status = 'Active',
-           mikrotik_status = 'Created'
-       WHERE stripe_session = ?`,
-      [session.id]
+           mikrotik_status = 'Created',
+           last_provision_error = NULL,
+           provisioned_at = COALESCE(provisioned_at, ?)
+       WHERE id = ?`,
+      [provisionedAt, customer.id]
     );
 
-    console.log(`Provisioned WiFi access for Stripe session ${session.id}`);
+    logger.info("Provisioned WiFi access for Stripe session", {
+      stripeSession: session.id,
+      userId: customer.id,
+      username: customer.username
+    });
+
+    return await db.get(
+      "SELECT * FROM wifi_users WHERE id = ?",
+      [customer.id]
+    );
   } catch (error) {
+    const errorMessage = String(error.message || error).slice(0, 250);
+
     await db.run(
       `UPDATE wifi_users
        SET wifi_status = 'Provisioning Error',
-           mikrotik_status = ?
-       WHERE stripe_session = ?`,
-      [error.message.slice(0, 250), session.id]
+           mikrotik_status = ?,
+           last_provision_error = ?
+       WHERE id = ?`,
+      [errorMessage, errorMessage, customer.id]
     );
+
+    logger.error("Paid customer provisioning failed", {
+      stripeSession: session.id,
+      userId: customer.id,
+      username: customer.username,
+      error
+    });
 
     throw error;
   }
+}
+
+async function beginWebhookEvent(event) {
+  const now = new Date().toISOString();
+  const sessionId =
+    event.data?.object?.object === "checkout.session"
+      ? event.data.object.id
+      : null;
+
+  const existing = await db.get(
+    "SELECT * FROM stripe_webhook_events WHERE event_id = ?",
+    [event.id]
+  );
+
+  if (!existing) {
+    await db.run(
+      `INSERT INTO stripe_webhook_events (
+        event_id,
+        event_type,
+        stripe_session,
+        status,
+        attempts,
+        last_error,
+        first_received,
+        last_received,
+        completed_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        event.id,
+        event.type,
+        sessionId,
+        "Processing",
+        1,
+        null,
+        now,
+        now,
+        null
+      ]
+    );
+
+    return { alreadyCompleted: false };
+  }
+
+  if (existing.status === "Completed") {
+    await db.run(
+      `UPDATE stripe_webhook_events
+       SET last_received = ?
+       WHERE event_id = ?`,
+      [now, event.id]
+    );
+
+    return { alreadyCompleted: true };
+  }
+
+  await db.run(
+    `UPDATE stripe_webhook_events
+     SET status = 'Processing',
+         attempts = attempts + 1,
+         last_received = ?,
+         last_error = NULL
+     WHERE event_id = ?`,
+    [now, event.id]
+  );
+
+  return { alreadyCompleted: false };
+}
+
+async function completeWebhookEvent(eventId) {
+  const now = new Date().toISOString();
+
+  await db.run(
+    `UPDATE stripe_webhook_events
+     SET status = 'Completed',
+         completed_at = ?,
+         last_error = NULL,
+         last_received = ?
+     WHERE event_id = ?`,
+    [now, now, eventId]
+  );
+}
+
+async function failWebhookEvent(eventId, error) {
+  const now = new Date().toISOString();
+  const message = String(error.message || error).slice(0, 500);
+
+  await db.run(
+    `UPDATE stripe_webhook_events
+     SET status = 'Failed',
+         last_error = ?,
+         last_received = ?
+     WHERE event_id = ?`,
+    [message, now, eventId]
+  );
 }
 
 /*
@@ -260,6 +442,20 @@ app.post(
     }
 
     try {
+      const eventState = await beginWebhookEvent(event);
+
+      if (eventState.alreadyCompleted) {
+        logger.info("Duplicate completed Stripe webhook ignored", {
+          eventId: event.id,
+          eventType: event.type
+        });
+
+        return res.json({
+          received: true,
+          duplicate: true
+        });
+      }
+
       if (event.type === "checkout.session.completed") {
         const session = event.data.object;
 
@@ -268,10 +464,32 @@ app.post(
         }
       }
 
+      await completeWebhookEvent(event.id);
+
       return res.json({ received: true });
     } catch (error) {
-      console.error("Stripe webhook processing error:", error);
-      return res.status(500).json({ error: "Webhook processing failed." });
+      try {
+        await failWebhookEvent(event.id, error);
+      } catch (trackingError) {
+        logger.error("Unable to record Stripe webhook failure", {
+          eventId: event.id,
+          error: trackingError
+        });
+      }
+
+      logger.error("Stripe webhook processing error", {
+        eventId: event.id,
+        eventType: event.type,
+        error
+      });
+
+      /*
+       * Return 500 so Stripe retries. The retry is safe because both the
+       * webhook event and stripe_session are now idempotent.
+       */
+      return res.status(500).json({
+        error: "Webhook processing failed and will be retried."
+      });
     }
   }
 );
@@ -904,6 +1122,132 @@ app.post("/api/admin/maintenance/run", requireAdmin, async (req, res) => {
     });
   }
 });
+
+
+app.get("/api/admin/provisioning-status", requireAdmin, async (req, res) => {
+  try {
+    const failedUsers = await db.all(
+      `SELECT
+         id,
+         email,
+         plan,
+         username,
+         stripe_session,
+         wifi_status,
+         mikrotik_status,
+         provision_attempts,
+         last_provision_attempt,
+         last_provision_error
+       FROM wifi_users
+       WHERE payment_status = 'Paid'
+         AND wifi_status IN ('Pending', 'Provisioning Error')
+       ORDER BY created DESC`
+    );
+
+    const failedEvents = await db.all(
+      `SELECT
+         event_id,
+         event_type,
+         stripe_session,
+         status,
+         attempts,
+         last_error,
+         first_received,
+         last_received
+       FROM stripe_webhook_events
+       WHERE status = 'Failed'
+       ORDER BY last_received DESC
+       LIMIT 25`
+    );
+
+    return res.json({
+      healthy: failedUsers.length === 0 && failedEvents.length === 0,
+      failedUsers,
+      failedEvents,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error("Provisioning status lookup failed", { error });
+    return res.status(500).json({
+      error: "Unable to load provisioning status."
+    });
+  }
+});
+
+app.post(
+  "/api/admin/provisioning/users/:id/retry",
+  requireAdmin,
+  async (req, res) => {
+    const userId = Number(req.params.id);
+
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return res.status(400).json({ error: "Invalid customer ID." });
+    }
+
+    try {
+      const user = await db.get(
+        `SELECT *
+         FROM wifi_users
+         WHERE id = ?`,
+        [userId]
+      );
+
+      if (!user) {
+        return res.status(404).json({ error: "Customer not found." });
+      }
+
+      if (user.payment_status !== "Paid") {
+        return res.status(400).json({
+          error: "Only paid customer provisioning may be retried."
+        });
+      }
+
+      const planKey = Object.entries(plans).find(
+        ([, plan]) => plan.displayName === user.plan
+      )?.[0];
+
+      if (!planKey) {
+        return res.status(400).json({
+          error: `Unable to map stored plan: ${user.plan}`
+        });
+      }
+
+      const syntheticSession = {
+        id: user.stripe_session,
+        metadata: { plan: planKey },
+        customer_details: { email: user.email },
+        customer_email: user.email,
+        payment_intent: user.stripe_payment_intent,
+        payment_status: "paid"
+      };
+
+      const result = await provisionCompletedCheckout(syntheticSession);
+
+      logger.info("Admin provisioning retry completed", {
+        userId,
+        stripeSession: user.stripe_session,
+        username: user.username
+      });
+
+      return res.json({
+        success: true,
+        id: result.id,
+        username: result.username,
+        wifiStatus: result.wifi_status,
+        mikrotikStatus: result.mikrotik_status
+      });
+    } catch (error) {
+      logger.error("Admin provisioning retry failed", {
+        userId,
+        error
+      });
+
+      return res.status(500).json({
+        error: error.message || "Unable to retry provisioning."
+      });
+    }
+  }
+);
 
 app.get("/api/admin/dashboard", requireAdmin, async (req, res) => {
   try {
