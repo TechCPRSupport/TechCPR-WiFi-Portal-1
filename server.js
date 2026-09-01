@@ -7,6 +7,7 @@ require("dotenv").config();
 const db = require("./database");
 const createCode = require("./generator");
 const mikrotik = require("./mikrotik");
+const logger = require("./logger");
 
 const REQUIRED_ENV = [
   "STRIPE_SECRET_KEY",
@@ -22,6 +23,8 @@ for (const name of REQUIRED_ENV) {
 }
 
 const app = express();
+app.use(logger.requestMiddleware);
+
 const port = Number(process.env.PORT || 3000);
 const baseUrl = (process.env.BASE_URL || `http://localhost:${port}`).replace(/\/+$/, "");
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -404,6 +407,83 @@ app.post("/api/admin/logout", requireAdmin, (req, res) => {
   return res.json({ success: true });
 });
 
+
+
+app.get("/api/admin/sync-status", requireAdmin, async (req, res) => {
+  try {
+    const [databaseUsers, routerUsers] = await Promise.all([
+      db.all(
+        `SELECT id, username, wifi_status, mikrotik_status, expires
+         FROM wifi_users
+         WHERE wifi_status IN ('Active', 'Suspended', 'Provisioning Error')
+         ORDER BY username`
+      ),
+      mikrotik.listWifiUsers()
+    ]);
+
+    const routerByName = new Map(
+      routerUsers.filter(user => user.name).map(user => [user.name, user])
+    );
+    const databaseByName = new Map(
+      databaseUsers.map(user => [user.username, user])
+    );
+
+    const missingOnRouter = databaseUsers
+      .filter(user => !routerByName.has(user.username))
+      .map(user => ({
+        username: user.username,
+        wifiStatus: user.wifi_status,
+        mikrotikStatus: user.mikrotik_status
+      }));
+
+    const stateMismatches = databaseUsers
+      .filter(user => {
+        const routerUser = routerByName.get(user.username);
+        if (!routerUser) return false;
+
+        const shouldBeDisabled = user.wifi_status === "Suspended";
+        return routerUser.disabled !== shouldBeDisabled;
+      })
+      .map(user => {
+        const routerUser = routerByName.get(user.username);
+        return {
+          username: user.username,
+          wifiStatus: user.wifi_status,
+          routerDisabled: routerUser.disabled
+        };
+      });
+
+    const orphanedRouterUsers = routerUsers
+      .filter(user =>
+        user.name &&
+        /^CPR/i.test(user.name) &&
+        !databaseByName.has(user.name)
+      )
+      .map(user => ({
+        username: user.name,
+        disabled: user.disabled,
+        profile: user.profile
+      }));
+
+    return res.json({
+      healthy:
+        missingOnRouter.length === 0 &&
+        stateMismatches.length === 0 &&
+        orphanedRouterUsers.length === 0,
+      databaseUsersChecked: databaseUsers.length,
+      routerUsersChecked: routerUsers.length,
+      missingOnRouter,
+      stateMismatches,
+      orphanedRouterUsers,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error("Router/database sync check failed", { error });
+    return res.status(500).json({
+      error: "Unable to compare database and MikroTik users."
+    });
+  }
+});
 
 app.get("/api/admin/dashboard", requireAdmin, async (req, res) => {
   try {
@@ -1023,18 +1103,86 @@ app.use((error, req, res, next) => {
   res.status(500).json({ error: "Internal server error." });
 });
 
+let httpServer = null;
+let expirationTimer = null;
+let shuttingDown = false;
+
+async function shutdown(reason, exitCode = 0) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+
+  logger.info("TechCPR shutdown started", { reason, exitCode });
+
+  if (expirationTimer) {
+    clearInterval(expirationTimer);
+    expirationTimer = null;
+  }
+
+  if (httpServer) {
+    await new Promise(resolve => {
+      const forceTimer = setTimeout(() => {
+        logger.warn("HTTP shutdown timeout reached; continuing shutdown.");
+        resolve();
+      }, 8_000);
+
+      forceTimer.unref();
+
+      httpServer.close(() => {
+        clearTimeout(forceTimer);
+        resolve();
+      });
+    });
+  }
+
+  try {
+    await db.close();
+    logger.info("SQLite connection closed.");
+  } catch (error) {
+    logger.error("SQLite close failed", { error });
+    exitCode = exitCode || 1;
+  }
+
+  logger.info("TechCPR shutdown complete", { reason, exitCode });
+  process.exit(exitCode);
+}
+
 async function start() {
   await db.initialize();
   await markExpiredUsers();
 
-  setInterval(markExpiredUsers, 60_000).unref();
+  expirationTimer = setInterval(markExpiredUsers, 60_000);
+  expirationTimer.unref();
 
-  app.listen(port, () => {
-    console.log(`TechCPR server running at ${baseUrl}`);
+  httpServer = app.listen(port, () => {
+    logger.info("TechCPR server started", {
+      baseUrl,
+      node: process.versions.node,
+      pid: process.pid
+    });
   });
 }
 
+process.on("SIGINT", () => {
+  shutdown("SIGINT", 0);
+});
+
+process.on("SIGTERM", () => {
+  shutdown("SIGTERM", 0);
+});
+
+process.on("uncaughtException", error => {
+  logger.error("Uncaught exception", { error });
+  shutdown("uncaughtException", 1);
+});
+
+process.on("unhandledRejection", reason => {
+  logger.error("Unhandled promise rejection", {
+    error: reason instanceof Error ? reason : new Error(String(reason))
+  });
+  shutdown("unhandledRejection", 1);
+});
+
 start().catch(error => {
-  console.error("TechCPR server failed to start:", error);
-  process.exit(1);
+  logger.error("TechCPR server failed to start", { error });
+  shutdown("startup failure", 1);
 });

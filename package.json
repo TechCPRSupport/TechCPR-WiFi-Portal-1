@@ -12,7 +12,8 @@
     "backup": "node scripts/backup-db.js",
     "test:mikrotik": "node test-mikrotik.js",
     "test:provision": "node test-provision.js",
-    "postinstall": "node scripts/patch-node-routeros.js"
+    "postinstall": "node scripts/patch-node-routeros.js",
+    "sync:check": "node scripts/check-sync.js"
   },
   "engines": {
     "node": ">=20.17.0"

@@ -184,10 +184,25 @@ async function removeWifiUser(username) {
     });
 }
 
+async function listWifiUsers() {
+    return withConnection(async (connection) => {
+        const users = await connection.write("/ip/hotspot/user/print");
+
+        return users.map(user => ({
+            id: user[".id"] || null,
+            name: user.name || "",
+            profile: user.profile || "",
+            disabled: String(user.disabled || "false").toLowerCase() === "true",
+            comment: user.comment || ""
+        }));
+    });
+}
+
 module.exports = {
     testConnection,
     createWifiUser,
     disableWifiUser,
     enableWifiUser,
-    removeWifiUser
+    removeWifiUser,
+    listWifiUsers
 };
