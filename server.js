@@ -58,14 +58,49 @@ function isValidEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-function requireAdmin(req, res, next) {
-  const suppliedPassword = req.get("x-admin-password");
+const ADMIN_SESSION_TTL_MS = Number(
+  process.env.ADMIN_SESSION_TTL_MS || 8 * 60 * 60 * 1000
+);
+const adminSessions = new Map();
 
-  if (suppliedPassword !== process.env.ADMIN_PASSWORD) {
-    return res.status(401).json({ error: "Unauthorized." });
+function cleanAdminSessions() {
+  const now = Date.now();
+  for (const [token, session] of adminSessions.entries()) {
+    if (!session || session.expiresAt <= now) {
+      adminSessions.delete(token);
+    }
+  }
+}
+
+function createAdminSession() {
+  cleanAdminSessions();
+  const token = crypto.randomBytes(32).toString("hex");
+  const expiresAt = Date.now() + ADMIN_SESSION_TTL_MS;
+  adminSessions.set(token, { expiresAt });
+  return { token, expiresAt: new Date(expiresAt).toISOString() };
+}
+
+function getAdminToken(req) {
+  return String(req.get("x-admin-token") || "").trim();
+}
+
+function requireAdmin(req, res, next) {
+  cleanAdminSessions();
+
+  const token = getAdminToken(req);
+  const session = token ? adminSessions.get(token) : null;
+
+  if (session && session.expiresAt > Date.now()) {
+    req.adminSessionToken = token;
+    return next();
   }
 
-  next();
+  const suppliedPassword = req.get("x-admin-password");
+  if (suppliedPassword === process.env.ADMIN_PASSWORD) {
+    return next();
+  }
+
+  return res.status(401).json({ error: "Unauthorized." });
 }
 
 async function markExpiredUsers() {
@@ -343,14 +378,30 @@ app.get("/api/status", async (req, res) => {
 });
 
 app.post("/api/admin/login", (req, res) => {
-  if (req.body?.password === process.env.ADMIN_PASSWORD) {
-    return res.json({ success: true });
+  if (req.body?.password !== process.env.ADMIN_PASSWORD) {
+    return res.status(401).json({
+      success: false,
+      error: "Invalid admin password."
+    });
   }
 
-  return res.status(401).json({
-    success: false,
-    error: "Invalid admin password."
+  const session = createAdminSession();
+
+  return res.json({
+    success: true,
+    token: session.token,
+    expiresAt: session.expiresAt
   });
+});
+
+app.get("/api/admin/session", requireAdmin, (req, res) => {
+  return res.json({ success: true });
+});
+
+app.post("/api/admin/logout", requireAdmin, (req, res) => {
+  const token = getAdminToken(req);
+  if (token) adminSessions.delete(token);
+  return res.json({ success: true });
 });
 
 

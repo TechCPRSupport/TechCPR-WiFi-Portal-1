@@ -77,18 +77,8 @@
     loginButton.textContent = "Signing In…";
 
     try {
-      const response = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password })
-      });
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || "Login failed.");
-      }
-
-      adminPassword = password;
+      await TechCPRAdmin.login(password);
+      adminPassword = "";
       loginPanel.hidden = true;
       dashboard.hidden = false;
       await loadUsers();
@@ -100,7 +90,8 @@
     }
   }
 
-  function logout() {
+  async function logout() {
+    await TechCPRAdmin.logout();
     adminPassword = "";
     users = [];
     passwordInput.value = "";
@@ -113,11 +104,10 @@
   async function api(path, options = {}) {
     const response = await fetch(path, {
       ...options,
-      headers: {
-        "x-admin-password": adminPassword,
+      headers: TechCPRAdmin.headers({
         ...(options.body ? { "Content-Type": "application/json" } : {}),
         ...(options.headers || {})
-      }
+      })
     });
 
     const data = await response.json();
@@ -433,4 +423,15 @@
   function normalize(value) {
     return String(value || "").trim().toLowerCase();
   }
+  async function resumeAdminSession() {
+    if (!TechCPRAdmin.hasSession()) return;
+    if (!await TechCPRAdmin.validate()) return;
+
+    loginPanel.hidden = true;
+    dashboard.hidden = false;
+    await loadUsers();
+  }
+
+  resumeAdminSession();
+
 })();

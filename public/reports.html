@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>TechCPR Reporting & Analytics</title>
-  <link rel="stylesheet" href="/css/main.css?v=5.3">
+  <link rel="stylesheet" href="/css/main.css?v=5.4">
 </head>
 <body>
   <div class="app-shell">
@@ -50,6 +50,12 @@
             </a>
             <a class="button button--secondary action-link" href="/admin.html">
               Customers
+            </a>
+            <a class="button button--secondary action-link admin-nav-active" href="/reports.html">
+              Reports
+            </a>
+            <a class="button button--secondary action-link" href="/status.html">
+              System Status
             </a>
             <button id="export-csv" class="button button--secondary" type="button">
               Export CSV
@@ -137,6 +143,7 @@
   </div>
 
   <script src="/js/common.js" defer></script>
+  <script src="/js/admin-auth.js" defer></script>
   <script src="/js/reports.js" defer></script>
 </body>
 </html>

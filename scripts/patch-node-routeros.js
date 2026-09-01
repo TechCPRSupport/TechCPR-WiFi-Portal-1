@@ -11,26 +11,74 @@ const channelPath = path.join(
 );
 
 if (!fs.existsSync(channelPath)) {
-  console.warn("node-routeros Channel.js was not found; compatibility patch skipped.");
+  console.warn(
+    "node-routeros Channel.js was not found; RouterOS compatibility patch skipped."
+  );
   process.exit(0);
 }
 
 let source = fs.readFileSync(channelPath, "utf8");
 
-if (source.includes("case '!empty':")) {
-  console.log("node-routeros RouterOS !empty compatibility patch already present.");
+const incorrectPatch = `            case '!done':
+                if (!this.trapped)
+                    this.emit('done', this.data);
+                this.close();
+                break;
+            case '!empty':
+                if (!this.trapped)
+                    this.emit('done', this.data);
+                this.close();
+                break;`;
+
+const correctedPatch = `            case '!done':
+                if (!this.trapped)
+                    this.emit('done', this.data);
+                this.close();
+                break;
+            case '!empty':
+                break;`;
+
+const correctEmptyOnly = `            case '!empty':
+                break;`;
+
+if (source.includes(incorrectPatch)) {
+  source = source.replace(incorrectPatch, correctedPatch);
+  fs.writeFileSync(channelPath, source, "utf8");
+  console.log(
+    "Corrected node-routeros RouterOS 7 !empty handling (RC5.4.1)."
+  );
   process.exit(0);
 }
 
-const marker = `            case '!done':\n                if (!this.trapped)\n                    this.emit('done', this.data);\n                this.close();\n                break;`;
+if (source.includes(correctEmptyOnly)) {
+  console.log(
+    "node-routeros RouterOS 7 !empty handling is already correct."
+  );
+  process.exit(0);
+}
 
-const replacement = `${marker}\n            case '!empty':\n                if (!this.trapped)\n                    this.emit('done', this.data);\n                this.close();\n                break;`;
+const doneMarker = `            case '!done':
+                if (!this.trapped)
+                    this.emit('done', this.data);
+                this.close();
+                break;`;
 
-if (!source.includes(marker)) {
-  console.error("Unable to locate the expected node-routeros Channel.js block.");
+if (!source.includes(doneMarker)) {
+  console.error(
+    "Unable to locate the expected node-routeros Channel.js !done block."
+  );
   process.exit(1);
 }
 
-source = source.replace(marker, replacement);
+source = source.replace(
+  doneMarker,
+  `${doneMarker}
+            case '!empty':
+                break;`
+);
+
 fs.writeFileSync(channelPath, source, "utf8");
-console.log("Applied RouterOS 7 !empty compatibility patch to node-routeros.");
+
+console.log(
+  "Applied node-routeros RouterOS 7 !empty compatibility patch (RC5.4.1)."
+);

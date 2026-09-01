@@ -38,18 +38,8 @@
     loginButton.textContent = "Signing In…";
 
     try {
-      const response = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password })
-      });
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || "Login failed.");
-      }
-
-      adminPassword = password;
+      await TechCPRAdmin.login(password);
+      adminPassword = "";
       loginPanel.hidden = true;
       content.hidden = false;
       await loadReports();
@@ -61,7 +51,8 @@
     }
   }
 
-  function signOut() {
+  async function signOut() {
+    await TechCPRAdmin.logout();
     adminPassword = "";
     passwordInput.value = "";
     content.hidden = true;
@@ -75,7 +66,7 @@
 
     try {
       const response = await fetch("/api/admin/reports", {
-        headers: { "x-admin-password": adminPassword },
+        headers: TechCPRAdmin.headers(),
         cache: "no-store"
       });
       const data = await response.json();
@@ -191,7 +182,7 @@
 
     try {
       const response = await fetch("/api/admin/reports.csv", {
-        headers: { "x-admin-password": adminPassword },
+        headers: TechCPRAdmin.headers(),
         cache: "no-store"
       });
 
@@ -218,4 +209,15 @@
       exportButton.textContent = "Export CSV";
     }
   }
+  async function resumeAdminSession() {
+    if (!TechCPRAdmin.hasSession()) return;
+    if (!await TechCPRAdmin.validate()) return;
+
+    loginPanel.hidden = true;
+    content.hidden = false;
+    await loadReports();
+  }
+
+  resumeAdminSession();
+
 })();

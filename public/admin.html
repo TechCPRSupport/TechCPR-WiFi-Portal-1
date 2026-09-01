@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>TechCPR Customer Management</title>
-  <link rel="stylesheet" href="/css/main.css?v=5.2">
+  <link rel="stylesheet" href="/css/main.css?v=5.4">
 </head>
 <body>
   <div class="app-shell">
@@ -48,6 +48,15 @@
           <div class="admin-topbar__actions">
             <a class="button button--secondary admin-link" href="/dashboard.html">
               Dashboard
+            </a>
+            <a class="button button--secondary admin-link admin-nav-active" href="/admin.html">
+              Customers
+            </a>
+            <a class="button button--secondary admin-link" href="/reports.html">
+              Reports
+            </a>
+            <a class="button button--secondary admin-link" href="/status.html">
+              System Status
             </a>
             <button id="new-customer-button" class="button" type="button">
               + Customer
@@ -187,6 +196,7 @@
   </dialog>
 
   <script src="/js/common.js" defer></script>
+  <script src="/js/admin-auth.js" defer></script>
   <script src="/js/admin.js" defer></script>
 </body>
 </html>

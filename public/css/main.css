@@ -486,3 +486,25 @@
   }
 }
 
+/* RC5.4 Shared Admin Navigation */
+.admin-nav-active{
+  border-color:var(--color-accent)!important;
+  background:rgba(29,167,255,.22)!important;
+  box-shadow:0 0 14px rgba(29,167,255,.12)!important;
+}
+.operations-actions,
+.admin-topbar__actions{
+  flex-wrap:wrap;
+}
+@media(max-width:1100px){
+  .operations-topbar,
+  .admin-topbar{
+    align-items:flex-start;
+    flex-direction:column;
+  }
+  .operations-actions,
+  .admin-topbar__actions{
+    width:100%;
+  }
+}
+
