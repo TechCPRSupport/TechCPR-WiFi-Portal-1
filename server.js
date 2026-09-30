@@ -88,21 +88,21 @@ const plans = Object.freeze({
   day: {
     displayName: "1 Day",
     stripeName: "TechCPR 1 Day WiFi",
-    amount: Number(process.env.PRICE_DAY_CENTS || 1000),
+    amount: Number(process.env.PRICE_DAY_CENTS || 500),
     profile: process.env.MIKROTIK_CUSTOMER_PROFILE || "customer",
     durationMs: 24 * 60 * 60 * 1000
   },
   week: {
     displayName: "7 Days",
     stripeName: "TechCPR 7 Day WiFi",
-    amount: Number(process.env.PRICE_WEEK_CENTS || 2500),
+    amount: Number(process.env.PRICE_WEEK_CENTS || 1000),
     profile: process.env.MIKROTIK_CUSTOMER_PROFILE || "customer",
     durationMs: 7 * 24 * 60 * 60 * 1000
   },
   month: {
     displayName: "1 Month",
     stripeName: "TechCPR 1 Month WiFi",
-    amount: Number(process.env.PRICE_MONTH_CENTS || 5000),
+    amount: Number(process.env.PRICE_MONTH_CENTS || 2000),
     profile: process.env.MIKROTIK_CUSTOMER_PROFILE || "customer",
     durationMs: 30 * 24 * 60 * 60 * 1000
   }
@@ -2116,3 +2116,4 @@ start().catch(error => {
   logger.error("TechCPR server failed to start", { error });
   shutdown("startup failure", 1);
 });
+
