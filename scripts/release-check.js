@@ -198,8 +198,8 @@ runNodeScript(
 );
 
 console.log("");
-console.log("TechCPR RC7 Release Candidate Check");
-console.log("===================================");
+console.log("TechCPR v1.0.0 Production Release Check");
+console.log("========================================");
 
 for (const result of results) {
   console.log(
@@ -224,7 +224,7 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log("Release candidate automated checks passed.");
+console.log("Production release automated checks passed.");
 console.log("");
 console.log(
   "Manual production validation: live Stripe checkout, success credentials, " +
