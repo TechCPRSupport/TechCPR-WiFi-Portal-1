@@ -198,7 +198,7 @@ runNodeScript(
 );
 
 console.log("");
-console.log("TechCPR RC6.6 Release Candidate Check");
+console.log("TechCPR RC6.7 Release Candidate Check");
 console.log("=====================================");
 
 for (const result of results) {

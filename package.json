@@ -1,6 +1,6 @@
 {
   "name": "techcpr-wifi-portal",
-  "version": "1.0.0-rc.6",
+  "version": "1.0.0-rc.7",
   "private": true,
   "description": "Stripe-powered WiFi captive portal with MikroTik HotSpot provisioning.",
   "main": "server.js",
@@ -14,6 +14,7 @@
     "backup": "node scripts/backup-db.js",
     "test:mikrotik": "node test-mikrotik.js",
     "test:provision": "node test-provision.js",
+    "test:webhook-replay": "node scripts/test-webhook-replay.js",
     "postinstall": "node scripts/patch-node-routeros.js",
     "sync:check": "node scripts/check-sync.js"
   },
