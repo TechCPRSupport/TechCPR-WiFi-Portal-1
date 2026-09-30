@@ -44,6 +44,7 @@ function checkFile(relativePath) {
 
 function checkEnv(name) {
   const value = String(process.env[name] || "").trim();
+
   record(
     `Environment: ${name}`,
     Boolean(value),
@@ -57,10 +58,18 @@ function checkGit() {
     ["status", "--porcelain"],
     {
       cwd: root,
-      encoding: "utf8",
-      shell: process.platform === "win32"
+      encoding: "utf8"
     }
   );
+
+  if (result.error) {
+    record(
+      "Git working tree",
+      false,
+      result.error.message || "Unable to execute git."
+    );
+    return;
+  }
 
   if (result.status !== 0) {
     record(
@@ -102,7 +111,11 @@ function checkBackupExists() {
     path.join(root, "backups");
 
   if (!fs.existsSync(backupDir)) {
-    record("Recent database backup", false, "backup directory missing");
+    record(
+      "Recent database backup",
+      false,
+      "backup directory missing"
+    );
     return;
   }
 
@@ -119,7 +132,11 @@ function checkBackupExists() {
     .sort((a, b) => b.mtimeMs - a.mtimeMs);
 
   if (!backups.length) {
-    record("Recent database backup", false, "no backup files found");
+    record(
+      "Recent database backup",
+      false,
+      "no backup files found"
+    );
     return;
   }
 
@@ -165,9 +182,20 @@ checkDatabaseExists();
 checkBackupExists();
 checkGit();
 
-runNodeScript("Production preflight", "scripts/preflight.js");
-runNodeScript("Security check", "scripts/security-check.js");
-runNodeScript("Router/database synchronization", "scripts/check-sync.js");
+runNodeScript(
+  "Production preflight",
+  "scripts/preflight.js"
+);
+
+runNodeScript(
+  "Security check",
+  "scripts/security-check.js"
+);
+
+runNodeScript(
+  "Router/database synchronization",
+  "scripts/check-sync.js"
+);
 
 console.log("");
 console.log("TechCPR RC6.6 Release Candidate Check");
@@ -179,7 +207,9 @@ for (const result of results) {
   );
 
   if (!result.ok && result.detail) {
-    console.log(`      ${String(result.detail).replace(/\n/g, "\n      ")}`);
+    console.log(
+      `      ${String(result.detail).replace(/\n/g, "\n      ")}`
+    );
   }
 }
 
