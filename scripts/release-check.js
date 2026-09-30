@@ -198,8 +198,8 @@ runNodeScript(
 );
 
 console.log("");
-console.log("TechCPR RC6.7 Release Candidate Check");
-console.log("=====================================");
+console.log("TechCPR RC7 Release Candidate Check");
+console.log("===================================");
 
 for (const result of results) {
   console.log(
@@ -227,6 +227,6 @@ if (failures.length) {
 console.log("Release candidate automated checks passed.");
 console.log("");
 console.log(
-  "Manual checks still required: Stripe test checkout, success credentials, " +
+  "Manual production validation: live Stripe checkout, success credentials, " +
   "admin pages, CSV export, graceful Ctrl+C shutdown, and duplicate webhook replay."
 );
